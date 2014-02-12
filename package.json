@@ -1,0 +1,30 @@
+{
+  "private": true,
+  "name": "objective-three",
+  "version": "0.0.1",
+  "description": "a scene/multi-scene management system for three",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/bingomanatee/objective-three.git"
+  },
+  "author": "",
+  "license": "BSD-2-Clause",
+  "bugs": {
+    "url": "https://github.com/bingomanatee/objective-three/issues"
+  },
+  "homepage": "https://github.com/bingomanatee/objective-three",
+  "devDependencies": {
+    "grunt": "~0.4.2",
+    "tap": "~0.4.8",
+    "grunt-umd": "~1.6.1",
+    "grunt-node-tap": "~0.1.52"
+  },
+  "dependencies": {
+    "three": "~0.58.10",
+    "underscore": "~1.6.0"
+  }
+}
