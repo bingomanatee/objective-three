@@ -9,26 +9,36 @@ var O3 = (function () {
 
     function _O3() {
         this.displays = {};
+        this.state = 'NOT STARTED';
     };
 
     var _proto = {
 
-        reset: function(){
-            _.each(this.displays, function(d){
+        reset: function () {
+            _.each(this.displays, function (d) {
                 d.destroy();
             });
             this.displays = {};
         },
 
-        displays:       [],
-        display: function (name, params) {
-            if (!this.displays[name]){
-                var display = new O3.Display(name, params);
+        displays: {},
+        display:  function (name, params) {
+            if (_.isObject(name)) {
+                params = name;
+                name = '';
+            }
+
+            if (!name) {
+                name = 'default';
+            }
+
+            if (!this.displays[name]) {
+                var display = new Display(name, params);
                 this.displays[name] = display;
                 this.emit('display', name, display);
             }
             return this.displays[name];
-        }, util:        {
+        }, util:  {
             assign: function (target, field, value) {
                 var args = _.toArray(arguments);
 
@@ -46,7 +56,7 @@ var O3 = (function () {
 
             as_test: function (fn, msg) {
                 return function (v) {
-                    return fn(v) ? false: msg;
+                    return fn(v) ? false : msg;
                 }
             },
 
@@ -61,6 +71,25 @@ var O3 = (function () {
                     }
                 });
             }
+        },
+
+        _start_time: 0,
+        _ani_time:   0,
+        time:        function () {
+            return this._ani_time - this._start_time;
+        },
+
+        animate: function () {
+            if (!this._start_time) {
+                this._start_time = new Date().getTime();
+            }
+            this._ani_time = new Date().getTime();
+
+            _.each(this.displays, function (display) {
+                display.animate();
+            });
+
+            requestAnimationFrame(this.animate.bind(this));
         }
     };
 

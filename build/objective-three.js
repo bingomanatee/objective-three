@@ -320,26 +320,36 @@ var O3 = (function () {
 
     function _O3() {
         this.displays = {};
+        this.state = 'NOT STARTED';
     };
 
     var _proto = {
 
-        reset: function(){
-            _.each(this.displays, function(d){
+        reset: function () {
+            _.each(this.displays, function (d) {
                 d.destroy();
             });
             this.displays = {};
         },
 
-        displays:       [],
-        display: function (name, params) {
-            if (!this.displays[name]){
-                var display = new O3.Display(name, params);
+        displays: {},
+        display:  function (name, params) {
+            if (_.isObject(name)) {
+                params = name;
+                name = '';
+            }
+
+            if (!name) {
+                name = 'default';
+            }
+
+            if (!this.displays[name]) {
+                var display = new Display(name, params);
                 this.displays[name] = display;
                 this.emit('display', name, display);
             }
             return this.displays[name];
-        }, util:        {
+        }, util:  {
             assign: function (target, field, value) {
                 var args = _.toArray(arguments);
 
@@ -357,7 +367,7 @@ var O3 = (function () {
 
             as_test: function (fn, msg) {
                 return function (v) {
-                    return fn(v) ? false: msg;
+                    return fn(v) ? false : msg;
                 }
             },
 
@@ -372,6 +382,25 @@ var O3 = (function () {
                     }
                 });
             }
+        },
+
+        _start_time: 0,
+        _ani_time:   0,
+        time:        function () {
+            return this._ani_time - this._start_time;
+        },
+
+        animate: function () {
+            if (!this._start_time) {
+                this._start_time = new Date().getTime();
+            }
+            this._ani_time = new Date().getTime();
+
+            _.each(this.displays, function (display) {
+                display.animate();
+            });
+
+            requestAnimationFrame(this.animate.bind(this));
         }
     };
 
@@ -385,7 +414,8 @@ var O3 = (function () {
 
 /**
  * A Display governs all activity targeting a specific output div.
- * @param params
+ * @param name {string}
+ * @param params {Object}
  * @constructor
  */
 
@@ -395,17 +425,31 @@ function Display(name, params) {
     this._width = 100;
     this._height = 100;
     this._scenes = {};
+    this._cameras = {};
+    this._objects = [];
+    this.active = true;
+    this.update_on_animate = true;
 
     if (params) {
 
-        var tokens = _.pick(parmas, 'width', 'height');
+        var tokens = _.pick(params, Display.PROPERTIES);
         delete params.width;
         delete params.height;
         _.extend(this, params);
         _.each(tokens, function (value, name) {
-            this.call(name, this, value);
+            this[name].call(this, value);
         }, this);
     }
+
+    this.on('resize', function () {
+        this.renderer.setSize(this.width(), this.height());
+        _.each(this._cameras, function (c) {
+            if (c.aspect) {
+                c.aspect = this.width() / this.height();
+                c.updateProjectionMatrix();
+            }
+        }, this);
+    }.bind(this));
 }
 
 O3.util.inherits(Display, EventEmitter);
@@ -413,24 +457,118 @@ O3.util.inherits(Display, EventEmitter);
 _.extend(
     Display.prototype, {
 
+        add: function (object, scene) {
+            this._objects.push(object);
+
+            var s = this.scene(scene);
+            s.add(object.content);
+            object.scene = s;
+            object.parent = this;
+        },
+
+        remove: function (object) {
+            object.scene.remove(object.content);
+            this._objects = _.reject(this._objects, function (o) {
+                return o === object;
+            });
+        },
+
         destroy: function () {
             this.emit('destroy');
         },
 
-        scene: function (name) {
-            if (!name) {
-                name = 'default';
+        scenes: function () {
+            return _.keys(this._scenes);
+        },
+
+        camera: function (name, value) {
+
+            if (_.isObject(name)) {
+                value = name;
+                name = '';
             }
-            if (!this._scenes[name]) {
-                this._scenes[name] = new THREE.Scene();
+
+            if (!name) {
+                name = this._default_camera || 'default';
+            }
+            if (value || !this._cameras[name]) {
+
+                var self = this;
+                this._cameras[name] = _.extend(value || new THREE.PerspectiveCamera(),
+                    {
+                        name:     name,
+                        activate: function () {
+                            self._default_camera = this.name;
+                        }
+                    }
+                )
+                this._cameras[name].aspect = this.width() / this.height(); // note - irrelevant (but harmless) for orthographic camera
+                this._cameras[name].updateProjectionMatrix();
+
+                this.emit('camera added', this._cameras[name]);
+            }
+
+            return this._cameras[name]
+        },
+
+        /**
+         * note - unlike other properties, this class is not set up to
+         * be updated more than once.
+         *
+         * @param renderer
+         * @returns {*|THREE.WebGLRenderer}
+         */
+        renderer: function (renderer) {
+
+            if (renderer || !this._renderer) {
+                this._renderer = renderer || new THREE.WebGLRenderer();
+            }
+
+            this._renderer.setSize(this.width(), this.height());
+
+            return this._renderer;
+        },
+
+        scene: function (name, value) {
+
+            if (_.isObject(name)) {
+                value = name;
+                name = '';
+            }
+
+            if (!name) {
+                name = this._default_scene || 'default';
+            }
+            if (value || !this._scenes[name]) {
+
+                var self = this;
+                this._scenes[name] = _.extend(value || new THREE.Scene(),
+                    {
+                        name:     name,
+                        activate: function () {
+                            self._default_scene = this.name;
+                        }
+                    }
+                )
+                ;
                 this.emit('scene added', this._scenes[name]);
             }
             return this._scenes[name]
         },
 
-        height: function (value) {
+        size: function (w, h) {
+            if (arguments.length) {
+                var old_height = this.height(), old_width = this.height();
+                this.width(w, true);
+                this.height(h, true);
+                this.emit('resized', this._width, this._height, old_width, old_height);
+            }
+            return [this.width(), this.height()];
+        },
+
+        height: function (value, noEmit) {
             if (arguments.length && (value != this._height)) {
-                var old_height = this._height, old_width = this._width;
+                var old_height = this.height(), old_width = this.width();
                 O3.util.assign(this, '_height', value,
                     O3.util.as_test(_.isNumber, 'height must be a number'),
                     function (v) {
@@ -439,13 +577,15 @@ _.extend(
                         }
                     }
                 );
-                this.emit('resized', this._width, this._height, old_width, old_height);
+                if (!noEmit) {
+                    this.emit('resized', this._width, this._height, old_width, old_height);
+                }
             }
 
             return this._height;
         },
 
-        width: function (value) {
+        width: function (value, noEmit) {
 
             if (arguments.length && value != this._width) {
                 var old_height = this._height, old_width = this._width;
@@ -455,13 +595,86 @@ _.extend(
                         return v <= 0 ? 'width must be > 0' : false;
                     }
                 );
-                this.emit('resized', this._width, this._height, old_width, old_height);
+                if (!noEmit) {
+                    this.emit('resized', this._width, this._height, old_width, old_height);
+                }
             }
 
             return this._width;
-        }
+        },
 
+        update: function (from_ani) {
+            _.each(this._objects, function (o) {
+                if ((!from_ani) || (o.update_on_animate)) {
+                    o.emit('update');
+                }
+            })
+        },
+
+        animate: function () {
+            if (!this.active) {
+                return;
+            }
+            if (this.update_on_animate) {
+                this.update(true);
+            }
+            this.renderer().render(this.scene(), this.camera());
+        }
 
     });
 
-O3.Display = Display;
+Display.PROPERTIES = [ 'width', 'height', 'camera', 'scene', 'renderer'];
+function RenderObject(content, params) {
+    this.content = content;
+    this.display = null;
+    this.update_on_animate = true;
+
+    this.children = [];
+    this.parent = null;
+
+    var self = this;
+
+    _.each(['update'], function(event){
+        self.on(event, function(){
+            self[event]();
+            self._cascade(event);
+        })
+    });
+
+    _.extend(this, params);
+}
+
+O3.util.inherits(RenderObject, EventEmitter);
+
+_.extend(
+    RenderObject.prototype, {
+
+        _cascade: function (event, data) {
+            _.each(this.children, function (c) {
+                c.emit(event, data);
+            });
+        },
+
+        update: function () {
+
+        },
+
+        add: function (ro) {
+            this.children.push(ro);
+            this.content.add(ro.content);
+            ro.parent = this;
+        },
+
+        remove: function(ro){
+            ro.parent = null;
+            this.content.remove(ro.content);
+        },
+
+        detach: function(){
+            if (this.parent){
+                this.parent.remove(this);
+            }
+        }
+    });
+
+O3.RenderObject = RenderObject;

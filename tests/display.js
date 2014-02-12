@@ -1,62 +1,128 @@
 var tap = require('tap');
 var O3 = require('./../build/o3');
+var _ = require('underscore');
+
 tap.test('display', function (test) {
 
     test.test('width and height', function (test_w_h) {
 
-        var d = O3.display('foo');
+        test_w_h.test('set and get', function (set_get) {
 
-        var noticed = 0;
-        d.once('resized', function (w, h) {
-            test_w_h.equal(w, 200, 'width set to 200');
-            ++noticed;
-        })
+            var d = O3.display('foo');
 
-        d.width(200);
+            var noticed = 0;
+            d.once('resized', function (w, h) {
+                set_get.equal(w, 200, 'width set to 200');
+                ++noticed;
+            })
 
-        d.once('resized', function (w, h) {
-            test_w_h.equal(h, 300, 'height set to 300');
-            ++noticed;
+            d.width(200);
+
+            d.once('resized', function (w, h) {
+                set_get.equal(h, 300, 'height set to 300');
+                ++noticed;
+            });
+
+            d.height(300);
+
+            d.once('resized', function () {
+                ++noticed;
+            });
+
+            set_get.equal(d.height(), 300, 'height of 300 retrieved - no resize');
+
+            set_get.equal(noticed, 2, 'noticed twice');
+
+            O3.reset();
+            set_get.end();
         });
 
-        d.height(300);
+        test_w_h.test('construction', function (con) {
 
-        d.once('resized', function () {
-            ++noticed;
+            var display = O3.display({width: 250, height: 350});
+
+            con.equal(display.width(), 250, 'width is 250');
+            con.equal(display.height(), 350, 'height is 350');
+
+            var d2 = O3.display('foo', {width: 200, height: 250});
+
+            con.equal(d2.width(), 200, 'width is 200');
+            con.equal(d2.height(), 250, 'height is 250');
+
+            O3.reset();
+            con.end();
         });
 
-        test_w_h.equal(d.height(), 300, 'height of 300 retrieved - no resize');
+        test_w_h.test('invalid data', function (validation) {
 
-        test_w_h.equal(noticed, 2, 'noticed twice');
+            var d2 = O3.display('bar');
 
-        var d2 = O3.display('bar');
+            var error = null;
+            try {
+                d2.width(0);
+            }
+            catch (err) {
+                error = err;
+            }
 
-        var error = null;
-        try {
-            d2.width(0);
-        } catch(err){
-            error = err;
-        }
-        test_w_h.ok(error, 'setting width to 0 throws an error');
-        error = null;
-        try {
-            d2.width('foo');
-        } catch(err){
-            error = err;
-        }
+            validation.ok(error, 'setting width to 0 throws an error');
+            error = null;
+            try {
+                d2.width('foo');
+            }
+            catch (err) {
+                error = err;
+            }
 
-        test_w_h.ok(error, 'setting width to "foo" throws an error');
+            validation.ok(error, 'setting width to "foo" throws an error');
+
+            O3.reset();
+            validation.end();
+
+        });
         O3.reset();
         test_w_h.end();
     });
 
-    test.test('scene', function(test_scene){
+    test.test('camera', function (cam_test) {
+
+        var display = O3.display({width: 200, height: 400});
+
+        cam_test.equal(display.camera().aspect_ratio, 0.5, 'aspect ratio of camera = 0.5');
+
+        display.size(300, 200);
+        cam_test.equal(display.camera().aspect_ratio, 3/2, 'aspect ratio of camera = 1.5');
+
+        O3.reset();
+        cam_test.end();
+    });
+
+    test.test('scene', function (test_scene) {
 
         var display = O3.display('test_scene_display');
 
+        test_scene.deepEqual(display.scenes(), [], 'display has no scenes');
+
+        var s1 = display.scene();
+
+        test_scene.deepEqual(display.scenes(), ['default'], 'default scene spawned');
+        test_scene.equal(s1.name, 'default', 'anon scene is default');
+
+        var s2 = display.scene('s2');
+
+        test_scene.deepEqual(_.sortBy(display.scenes(), _.identity), ['default', 's2'], 'new scene spawned');
+
+        s2.activate();
+
+        test_scene.equal(display.scene().name, 's2', 's2 is activated');
+
+        s1.activate();
+
+        test_scene.equal(display.scene().name, 'default', 'default is active');
 
         test_scene.end();
-    })
+    });
+
     test.end();
 
 });
