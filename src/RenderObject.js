@@ -1,3 +1,5 @@
+
+
 function RenderObject(obj, params) {
     var def;
     if (_.isString(obj)) {
@@ -33,8 +35,11 @@ function RenderObject(obj, params) {
                 this.light(def[0]);
         }
     }
+    this.id = ++RenderObject.__id;
+
 }
 
+RenderObject.__id = 0;
 O3.util.inherits(RenderObject, EventEmitter);
 
 _.extend(
@@ -103,6 +108,9 @@ _.extend(
                     this.obj(new THREE.DirectionalLight());
                     break;
 
+                case 'ambient':
+                    this.obj(new THREE.AmbientLight());
+
             }
 
             return this;
@@ -127,17 +135,20 @@ _.extend(
 
         position: function (x, y, z) {
             var o = this.obj();
-            if (!_.isNull(x)) {
+            if (arguments.length){
+
+            if (!_.isNull(x) || (!_.isUndefined(x))) {
                 o.position.x = x;
             }
-            if (!_.isNull(y)) {
+                if (!_.isNull(y) || (!_.isUndefined(y))) {
                 o.position.y = y;
             }
-            if (!_.isNull(z)) {
+                if (!_.isNull(z) || (!_.isUndefined(z))) {
                 o.position.z = z;
             }
+        }
 
-            return this
+            return o.position;
         },
 
         move: function (x, y, z) {

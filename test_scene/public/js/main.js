@@ -34,7 +34,6 @@
         var sphereGeo = new THREE.SphereGeometry(10);
         // Adding orbital spheres
         var pivot = new O3.RenderObject(new THREE.Object3D(), function () {
-            console.log('rotating sphere');
             this.obj().rotateY(0.1);
         });
         cube.add(pivot);

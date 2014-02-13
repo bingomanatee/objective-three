@@ -47,8 +47,8 @@ O3.util.inherits(Display, EventEmitter);
 _.extend(
     Display.prototype, {
 
-        mats: function(filter){
-          return filter ? _.where(_.values(this._mats), filter) : _.values(this._mats);
+        mats: function (filter) {
+            return filter ? _.where(_.values(this._mats), filter) : _.values(this._mats);
         },
 
         mat: function (name, params, value) {
@@ -82,7 +82,7 @@ _.extend(
 
         },
 
-        add: function (object, scene) {
+        add:  function (object, scene) {
             this._objects.push(object);
 
             var s = this.scene(scene);
@@ -91,10 +91,12 @@ _.extend(
             object.parent = this;
             return object;
         },
-        find: function(query){
+        find: function (query) {
             return _.where(this._objects, query);
         },
-
+        objects: function(readonly){
+            return readonly? this._objects : this._objects.slice();
+        },
         remove: function (object) {
             object.scene.remove(object.obj());
             this._objects = _.reject(this._objects, function (o) {
@@ -194,7 +196,7 @@ _.extend(
             return [this.width(), this.height()];
         },
 
-        append: function(parent){
+        append: function (parent) {
             parent.appendChild(this.renderer().domElement);
         },
 
@@ -243,14 +245,18 @@ _.extend(
             })
         },
 
-        animate: function () {
-            if (!this.active) {
-                return;
+        animate: function (t) {
+            this.emit('animate', t);
+            _.each(this.objects(1), function (o) {
+                o.emit('animate', t);
+            });
+
+            if (this.active && this.update_on_animate) {
+                if (this.update_on_animate) {
+                    this.update(true);
+                }
+                this.renderer().render(this.scene(), this.camera());
             }
-            if (this.update_on_animate) {
-                this.update(true);
-            }
-            this.renderer().render(this.scene(), this.camera());
         }
 
     });

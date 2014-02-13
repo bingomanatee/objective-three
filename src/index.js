@@ -123,9 +123,10 @@ var O3 = (function () {
             }
             this._ani_time = new Date().getTime();
 
+            this.emit('animate', this.time());
             _.each(this.displays, function (display) {
-                display.animate();
-            });
+                display.animate(this.time());
+            }, this);
 
             requestAnimationFrame(this.animate.bind(this));
         }

@@ -449,9 +449,10 @@ var O3 = (function () {
             }
             this._ani_time = new Date().getTime();
 
+            this.emit('animate', this.time());
             _.each(this.displays, function (display) {
-                display.animate();
-            });
+                display.animate(this.time());
+            }, this);
 
             requestAnimationFrame(this.animate.bind(this));
         }
@@ -514,8 +515,8 @@ O3.util.inherits(Display, EventEmitter);
 _.extend(
     Display.prototype, {
 
-        mats: function(filter){
-          return filter ? _.where(_.values(this._mats), filter) : _.values(this._mats);
+        mats: function (filter) {
+            return filter ? _.where(_.values(this._mats), filter) : _.values(this._mats);
         },
 
         mat: function (name, params, value) {
@@ -549,7 +550,7 @@ _.extend(
 
         },
 
-        add: function (object, scene) {
+        add:  function (object, scene) {
             this._objects.push(object);
 
             var s = this.scene(scene);
@@ -558,10 +559,12 @@ _.extend(
             object.parent = this;
             return object;
         },
-        find: function(query){
+        find: function (query) {
             return _.where(this._objects, query);
         },
-
+        objects: function(readonly){
+            return readonly? this._objects : this._objects.slice();
+        },
         remove: function (object) {
             object.scene.remove(object.obj());
             this._objects = _.reject(this._objects, function (o) {
@@ -661,7 +664,7 @@ _.extend(
             return [this.width(), this.height()];
         },
 
-        append: function(parent){
+        append: function (parent) {
             parent.appendChild(this.renderer().domElement);
         },
 
@@ -710,14 +713,18 @@ _.extend(
             })
         },
 
-        animate: function () {
-            if (!this.active) {
-                return;
+        animate: function (t) {
+            this.emit('animate', t);
+            _.each(this.objects(1), function (o) {
+                o.emit('animate', t);
+            });
+
+            if (this.active && this.update_on_animate) {
+                if (this.update_on_animate) {
+                    this.update(true);
+                }
+                this.renderer().render(this.scene(), this.camera());
             }
-            if (this.update_on_animate) {
-                this.update(true);
-            }
-            this.renderer().render(this.scene(), this.camera());
         }
 
     });
@@ -869,6 +876,8 @@ _.each('lambert,face,normal,phong,depth,basic'.split(','),
     function (base) {
         MatProxy.ALIASES[base] = MatProxy.ALIASES[base.toLowerCase()] = 'Mesh' + base.substr(0, 1).toUpperCase() + base.substr(1) + 'Material';
     });
+
+
 function RenderObject(obj, params) {
     var def;
     if (_.isString(obj)) {
@@ -904,8 +913,11 @@ function RenderObject(obj, params) {
                 this.light(def[0]);
         }
     }
+    this.id = ++RenderObject.__id;
+
 }
 
+RenderObject.__id = 0;
 O3.util.inherits(RenderObject, EventEmitter);
 
 _.extend(
@@ -974,6 +986,9 @@ _.extend(
                     this.obj(new THREE.DirectionalLight());
                     break;
 
+                case 'ambient':
+                    this.obj(new THREE.AmbientLight());
+
             }
 
             return this;
@@ -998,17 +1013,20 @@ _.extend(
 
         position: function (x, y, z) {
             var o = this.obj();
-            if (!_.isNull(x)) {
+            if (arguments.length){
+
+            if (!_.isNull(x) || (!_.isUndefined(x))) {
                 o.position.x = x;
             }
-            if (!_.isNull(y)) {
+                if (!_.isNull(y) || (!_.isUndefined(y))) {
                 o.position.y = y;
             }
-            if (!_.isNull(z)) {
+                if (!_.isNull(z) || (!_.isUndefined(z))) {
                 o.position.z = z;
             }
+        }
 
-            return this
+            return o.position;
         },
 
         move: function (x, y, z) {
