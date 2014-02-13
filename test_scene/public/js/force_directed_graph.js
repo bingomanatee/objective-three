@@ -79,13 +79,10 @@
 
             }});
 
-            // before each update, calculate the gravitational and
-            // repulsive forces of cubes.
+            // before each update, calculate the gravitational and repulsive forces of cubes.
 
             function calc_forces() {
-
                 var fop = force_obj.position();
-
                 ++force_obj.life;
 
                 if (force_obj.life > 200 && force_obj.vector.length() < 1){
