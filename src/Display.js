@@ -89,6 +89,7 @@ _.extend(
             s.add(object.obj());
             object.scene = s;
             object.parent = this;
+            return object;
         },
         find: function(query){
             return _.where(this._objects, query);
@@ -191,6 +192,10 @@ _.extend(
                 this.emit('resized', this._width, this._height, old_width, old_height);
             }
             return [this.width(), this.height()];
+        },
+
+        append: function(parent){
+            parent.appendChild(this.renderer().domElement);
         },
 
         height: function (value, noEmit) {

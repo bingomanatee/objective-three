@@ -5,6 +5,12 @@ function RenderObject(obj, params) {
         obj = null;
     }
 
+    if (_.isFunction(params)){
+        params = {
+            update: params
+        }
+    }
+
     this._obj = obj || new THREE.Object3D();
     this.display = null;
     this.update_on_animate = true;
@@ -39,6 +45,10 @@ _.extend(
                 this._obj = o;
             }
             return this._obj;
+        },
+
+        set: function(key, value){
+            this.obj()[key] = value;
         },
 
         _cascade: function (event, data) {

@@ -541,6 +541,7 @@ _.extend(
             s.add(object.obj());
             object.scene = s;
             object.parent = this;
+            return object;
         },
         find: function(query){
             return _.where(this._objects, query);
@@ -643,6 +644,10 @@ _.extend(
                 this.emit('resized', this._width, this._height, old_width, old_height);
             }
             return [this.width(), this.height()];
+        },
+
+        append: function(parent){
+            parent.appendChild(this.renderer().domElement);
         },
 
         height: function (value, noEmit) {
@@ -856,6 +861,12 @@ function RenderObject(obj, params) {
         obj = null;
     }
 
+    if (_.isFunction(params)){
+        params = {
+            update: params
+        }
+    }
+
     this._obj = obj || new THREE.Object3D();
     this.display = null;
     this.update_on_animate = true;
@@ -890,6 +901,10 @@ _.extend(
                 this._obj = o;
             }
             return this._obj;
+        },
+
+        set: function(key, value){
+            this.obj()[key] = value;
         },
 
         _cascade: function (event, data) {
