@@ -150,7 +150,7 @@ EventEmitter.prototype.addListener = function(type, listener) {
     if (!this._events[type])
     // Optimize the case of one listener. Don't need the extra array object.
         this._events[type] = listener;
-    else if (_.isObject(this._events[type]))
+    else if (_.isArray(this._events[type]))
     // If we've already got an array, just append.
         this._events[type].push(listener);
     else
@@ -321,9 +321,42 @@ var O3 = (function () {
     function _O3() {
         this.displays = {};
         this.state = 'NOT STARTED';
+        this._mats = {};
     };
 
     var _proto = {
+        mats: function(filter){
+            return filter ? _.where(_.values(this._mats), filter) : _.values(this._mats);
+        },
+
+        mat: function (name, params, value) {
+            if (!this._mats[name]) {
+                params = params || {};
+                _.extend( params, {context: this});
+                this._mats[name] = new MatProxy(name, params, this);
+                this._mats[name].addListener('refresh', function () {
+                    O3.update_mat(name);
+                })
+            } else if (params) {
+                if (_.isString(params)) {
+                    this._mats[name].set(params, value);
+                } else if (_.isObject(params)) {
+                    this._mats[name].set_params(params);
+                }
+            }
+
+            return this._mats[name];
+        },
+
+        update_mat: function (name) {
+            var mat = this.mat(name);
+
+            if (mat) {
+                _.each(this.displays, function (d) {
+                    d.update_mat(name);
+                })
+            }
+        },
 
         reset: function () {
             _.each(this.displays, function (d) {
@@ -381,6 +414,11 @@ var O3 = (function () {
                         configurable: true
                     }
                 });
+            },
+            rgb:      function (r, g, b) {
+                var c = new THREE.Color();
+                c.setRGB(r, g, b);
+                return c;
             }
         },
 
@@ -427,6 +465,8 @@ function Display(name, params) {
     this._scenes = {};
     this._cameras = {};
     this._objects = [];
+    this._mats = {};
+
     this.active = true;
     this.update_on_animate = true;
 
@@ -441,8 +481,10 @@ function Display(name, params) {
         }, this);
     }
 
-    this.on('resize', function () {
-        this.renderer.setSize(this.width(), this.height());
+    this.addListener('resized', function () {
+        if (this._renderer) {
+            this._renderer.setSize(this.width(), this.height());
+        }
         _.each(this._cameras, function (c) {
             if (c.aspect) {
                 c.aspect = this.width() / this.height();
@@ -457,17 +499,55 @@ O3.util.inherits(Display, EventEmitter);
 _.extend(
     Display.prototype, {
 
+        mats: function(filter){
+          return filter ? _.where(_.values(this._mats), filter) : _.values(this._mats);
+        },
+
+        mat: function (name, params, value) {
+            if (!this._mats[name]) {
+                if (params === false) {
+                    return null;
+                }
+                params = params || {};
+                _.extend(params, {context: this});
+                var p = new MatProxy(name, params);
+                this._mats[name] = p;
+                this._mats[name].addListener('refresh', function () {
+                    p.emit('refresh');
+                }.bind(this))
+            } else if (params) {
+                if (_.isString(params)) {
+                    this._mats[name].set(params, value);
+                } else if (_.isObject(params)) {
+                    this._mats[name].set_params(params);
+                }
+            }
+            return this._mats[name];
+        },
+
+        mat_values: function (name) {
+            return _.reduce(_.compact([
+                O3.mat(name).params(), local_mat(name).params()
+            ], function (o, p) {
+                return _.extend(o, p)
+            }, {}));
+
+        },
+
         add: function (object, scene) {
             this._objects.push(object);
 
             var s = this.scene(scene);
-            s.add(object.content);
+            s.add(object.obj());
             object.scene = s;
             object.parent = this;
         },
+        find: function(query){
+            return _.where(this._objects, query);
+        },
 
         remove: function (object) {
-            object.scene.remove(object.content);
+            object.scene.remove(object.obj());
             this._objects = _.reject(this._objects, function (o) {
                 return o === object;
             });
@@ -522,9 +602,8 @@ _.extend(
 
             if (renderer || !this._renderer) {
                 this._renderer = renderer || new THREE.WebGLRenderer();
+                this.renderer().setSize(this.width(), this.height());
             }
-
-            this._renderer.setSize(this.width(), this.height());
 
             return this._renderer;
         },
@@ -606,7 +685,7 @@ _.extend(
         update: function (from_ani) {
             _.each(this._objects, function (o) {
                 if ((!from_ani) || (o.update_on_animate)) {
-                    o.emit('update');
+                    o.emit('refresh');
                 }
             })
         },
@@ -624,8 +703,160 @@ _.extend(
     });
 
 Display.PROPERTIES = [ 'width', 'height', 'camera', 'scene', 'renderer'];
-function RenderObject(content, params) {
-    this.content = content;
+/**
+ * MatProy is a set of properties that the
+ * @param name
+ * @param params
+ * @constructor
+ */
+function MatProxy(name, params) {
+    this.name = name;
+    this.context = null;
+    if (params.context) {
+        this.context = params.context;
+        delete params.context;
+    }
+    this._params = params || {};
+}
+
+O3.util.inherits(MatProxy, EventEmitter);
+
+_.extend(MatProxy.prototype, {
+
+    set: function (prop, value) {
+        this._params[prop] = value;
+        this.update_obj();
+    },
+
+    get: function (prop) {
+        return this._params.hasOwnProperty(prop) ? this._params[prop] : null;
+    },
+
+    set_params: function (props) {
+        console.log('setting params of ', this.name, this.context, 'to', props);
+        _.extend(this._params, props);
+        this.update_obj();
+    },
+
+    parent: function () {
+        var parent = this.get('parent');
+        if (!parent) {
+            return null;
+        } else if (_.isString(parent) && (!this.name == parent)) {
+            return this.context.mat(parent);
+        } else {
+            return null;
+        }
+    },
+
+    params: function () {
+        var out;
+        var parent;
+        var base;
+
+        if (this._params.parent) {
+
+            if (_.isString(this._params.parent) && this.context) {
+                if (this._params.parent == this.name) {
+                    console.log('circular parenting');
+                } else {
+                    parent = this.context.mat(this._params.parent).params();
+                }
+            } else if (_.isObject(this._params.parent)) {
+                parent = this._params.parent;
+            }
+        }
+
+        if (this.context !== O3) {
+            base = O3.mat(this.name).params();
+        }
+
+        out = _.extend({type: 'basic'}, parent, base, this._params);
+
+        _.each(out, function (v, p) {
+            if (v && v.clone) {
+                out[p] = v.clone();
+            }
+        });
+
+        return out;
+    },
+
+    update_obj: function(){
+       if (this.context !== O3){
+           if (this._obj){
+               _.extend(this._obj, this.params());
+           }
+       }
+
+        _.each(this.children(), function(c){
+            c.update_obj();
+        });
+    },
+
+    children: function(){
+        var children = this.context.mats({parent: this.name});
+        if (this.context == O3){
+            _.each(this.context.displays, function(d){
+                children = children.concat(d.mats({name: this.name}))
+            }, this)
+        }
+    },
+
+    obj: function () {
+        if (!this._obj) {
+
+            var mat_values = this.params();
+
+            if (_.isString(mat_values.type)) {
+                if (THREE.hasOwnProperty(mat_values.type)) {
+                    this._obj = new THREE[mat_values.type](mat_values);
+                } else if (MatProxy.ALIASES[mat_values.type]) {
+                    var name = MatProxy.ALIASES[mat_values.type];
+                    if (THREE[name]) {
+                        this._obj = new THREE[name](mat_values);
+                    } else {
+                        throw new Error('cannot find material class ' + name);
+                    }
+                } else {
+                    throw new Error('cannot find material class ' + mat_values.type);
+                }
+
+            } else {
+                this._obj = new mat_values.type(mat_values);
+            }
+        }
+
+        return this._obj;
+    },
+
+    _on_update: function () {
+        if (this._obj) {
+            _.extend(this._obj, this.params());
+        }
+    }
+
+});
+
+MatProxy.ALIASES = {
+    '':           'MeshBasicMaterial',
+    shader:       'ShaderMaterial',
+    spritecanvas: 'SpriteCanvasMaterial',
+    'sprite':     'SpriteMaterial'
+};
+
+_.each('lambert,face,normal,phong,depth,basic'.split(','),
+    function (base) {
+        MatProxy.ALIASES[base] = MatProxy.ALIASES[base.toLowerCase()] = 'Mesh' + base.substr(0, 1).toUpperCase() + base.substr(1) + 'Material';
+    });
+function RenderObject(obj, params) {
+    var def;
+    if (_.isString(obj)) {
+        def = obj.split(' ');
+        obj = null;
+    }
+
+    this._obj = obj || new THREE.Object3D();
     this.display = null;
     this.update_on_animate = true;
 
@@ -634,20 +865,32 @@ function RenderObject(content, params) {
 
     var self = this;
 
-    _.each(['update'], function(event){
-        self.on(event, function(){
-            self[event]();
-            self._cascade(event);
-        })
+    self.addListener('refresh', function () {
+        self.update();
+        self._cascade('refresh');
     });
 
     _.extend(this, params);
+
+    if (def) {
+        switch (def[1]) {
+            case 'light':
+                this.light(def[0]);
+        }
+    }
 }
 
 O3.util.inherits(RenderObject, EventEmitter);
 
 _.extend(
     RenderObject.prototype, {
+
+        obj: function(o){
+            if(o){
+                this._obj = o;
+            }
+            return this._obj;
+        },
 
         _cascade: function (event, data) {
             _.each(this.children, function (c) {
@@ -661,19 +904,85 @@ _.extend(
 
         add: function (ro) {
             this.children.push(ro);
-            this.content.add(ro.content);
+            this.obj().add(ro.obj());
             ro.parent = this;
         },
 
-        remove: function(ro){
+        remove: function (ro) {
             ro.parent = null;
-            this.content.remove(ro.content);
+            this.obj.remove(ro.obj);
         },
 
-        detach: function(){
-            if (this.parent){
+        detach: function () {
+            if (this.parent) {
                 this.parent.remove(this);
             }
+        },
+
+        at: function (x, y, z) {
+            var o = this.obj();
+            o.position.x = x;
+            o.position.y = y;
+            o.position.z = z;
+
+            return this;
+        },
+
+        light: function (type) {
+            if (!type) {
+                type = 'point';
+            }
+            switch (type) {
+                case 'point':
+                    this.type = 'POINT_LIGHT';
+
+                    this.obj(new THREE.PointLight());
+                    break;
+
+                case 'directional':
+                case 'sun':
+                    this.obj(new THREE.DirectionalLight());
+                    break;
+
+            }
+
+            return this;
+
+        },
+
+        rgb: function (r, g, b) {
+            if (this.obj().color) {
+                this.obj().color.setRGB(r, g, b);
+            }
+
+            return this;
+        },
+
+        intensity: function (i) {
+            if (this.obj().hasOwnProperty('intensity')) {
+                this.obj().intensity = i;
+            }
+
+            return this;
+        },
+
+        position: function (x, y, z) {
+            var o = this.obj();
+            if (!_.isNull(x)) {
+                o.position.x = x;
+            }
+            if (!_.isNull(y)) {
+                o.position.y = y;
+            }
+            if (!_.isNull(z)) {
+                o.position.z = z;
+            }
+
+            return this
+        },
+
+        move: function (x, y, z) {
+            return this.position(x, y, z);
         }
     });
 

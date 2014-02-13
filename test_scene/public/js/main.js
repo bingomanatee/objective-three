@@ -1,72 +1,73 @@
 (function () {
-    var display = O3.display({width: 800, height: 500});
+    O3.mat('cube', {type: 'phong', color: O3.util.rgb(1, 1, 0.8)});
+    O3.mat('sphere', {type: 'lambert', color: O3.util.rgb(.2,.2,.2)});
+    O3.mat('sphere-white', {color: O3.util.rgb(1, 1, 1), parent: 'sphere'});
 
-    display.camera().translateY(-200);
-    document.body.appendChild(display.renderer().domElement);
+    function make_display(name){
+        var display = O3.display(name, {width: 800, height: 500});
 
-    var lightSource = new THREE.PointLight(new THREE.Color().setRGB(0.8, 0.9, 0.8).getHex());
-    lightSource.position.y = 400;
-    var light = new O3.RenderObject(lightSource,
 
-        {update: function () {
-            this.content.intensity = Math.cos(O3.time() / 100) + 1.1;
-        }});
-    display.add(light);
 
-    var lightSource2 = new THREE.PointLight(new THREE.Color().setRGB(0, 0, 1).getHex());
-    lightSource2.position.y = -400;
-    lightSource2.position.z = -800;
+        display.camera().translateY(-200);
 
-    var light = new O3.RenderObject(lightSource2,
-        {update: function () {
+        display.add(new O3.RenderObject('point light', {name: 'top light'}).at (-20, 200, -300).rgb(1, 1, 0.8));
+        display.add(new O3.RenderObject('point light', {name: 'blue underlight'}).at(0, -400, 800).rgb(0, 0, 1));
+        display.find({name: 'blue underlight'})[0].obj().intensity = 0.25;
 
-        }});
-    display.add(light);
+        var cubeGeo = new THREE.CubeGeometry(50, 50, 50);
+        var cubeMesh = new THREE.Mesh(cubeGeo, display.mat('cube').obj());
 
-    var cubeGeo = new THREE.CubeGeometry(50, 50, 50);
-    var mat = new THREE.MeshPhongMaterial({color: new THREE.Color().setRGB(0.5, 0.6, 0.4).getHex()});
-    var mat2 = new THREE.MeshPhongMaterial({color: new THREE.Color().setRGB(1, 1, 0.8).getHex()});
-    var cubeMesh = new THREE.Mesh(cubeGeo, mat);
+        var cube = new O3.RenderObject(cubeMesh, {
+            update: function () {
+                this.position(null, -100, -520 + O3.time() * -0.05);
+            }
 
-    var cube = new O3.RenderObject(cubeMesh, {
-        update: function () {
-            this.content.position.z = -520 + O3.time() * -0.05;
-            this.content.position.y = -100;
-        }
+        });
+        display.add(cube);
 
-    });
-    display.add(cube);
+        var sphereGeo = new THREE.SphereGeometry(10);
 
-    var sphereGeo = new THREE.SphereGeometry(10);
+        var pivot = new O3.RenderObject(new THREE.Object3D(), {
 
-    var pivot = new O3.RenderObject(new THREE.Object3D(), {
+            update: function () {
+                console.log('rotating sphere');
+                this.obj().rotateY(0.1);
+            }
+        });
 
-        update: function () {
-            console.log('rotating sphere');
-            this.content.rotateY(0.1);
-        }
-    });
+        _.each([-100, 100], function (x, i) {
+            _.each([-100, 100], function (y, j) {
+                var n = (i + j) % 2;
+                var sphereMesh = new THREE.Mesh(sphereGeo, display.mat('sphere' +( n ? '-white' : '')).obj());
+                sphereMesh.translateX(x);
+                sphereMesh.translateZ(y);
+                var sphere = new O3.RenderObject(sphereMesh, {
+                    update: function () {
+                        var o = this.obj();
+                        o.scale.x = o.scale.y = o.scale.z = Math.cos(O3.time() / 1000) + 1.5;
+                    }
 
-    _.each([-100, 100], function (x) {
-        _.each([-100, 100], function (y) {
+                });
+                pivot.add(sphere);
+            })
 
-            var sphereMesh = new THREE.Mesh(sphereGeo, mat2);
-            sphereMesh.translateX(x);
-            sphereMesh.translateZ(y);
-            var sphere = new O3.RenderObject(sphereMesh, {
-                update: function () {
-                    this.content.scale.x = this.content.scale.y = this.content.scale.z = Math.cos(O3.time() / 1000) + 1.5;
-                }
-
-            });
-            pivot.add(sphere);
         })
 
-    })
+        cube.add(pivot);
 
-    cube.add(pivot);
+        cubeMesh.rotateY(Math.PI / 6);
+        return display;
+    }
 
-    cubeMesh.rotateY(Math.PI / 6);
+    var d1 = make_display('alpha');
+    var d2 = make_display('beta');
+    d2.mat('cube', {color: O3.util.rgb(0, 1,0)});
+
+    d1.renderer().domElement.style.left = 800;
+    d1.renderer().domElement.style.position = 'absolute';
+
+    document.body.appendChild(d1.renderer().domElement);
+    document.body.appendChild(d2.renderer().domElement);
 
     O3.animate();
 })();

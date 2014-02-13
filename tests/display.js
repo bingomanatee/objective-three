@@ -1,6 +1,7 @@
 var tap = require('tap');
 var O3 = require('./../build/o3');
 var _ = require('underscore');
+var THREE = require('three');
 
 tap.test('display', function (test) {
 
@@ -88,10 +89,10 @@ tap.test('display', function (test) {
 
         var display = O3.display({width: 200, height: 400});
 
-        cam_test.equal(display.camera().aspect_ratio, 0.5, 'aspect ratio of camera = 0.5');
+        cam_test.equal(display.camera().aspect, 0.5, 'aspect ratio of camera = 0.5');
 
         display.size(300, 200);
-        cam_test.equal(display.camera().aspect_ratio, 3/2, 'aspect ratio of camera = 1.5');
+        cam_test.equal(display.camera().aspect, 3 / 2, 'aspect ratio of camera = 1.5');
 
         O3.reset();
         cam_test.end();
@@ -122,6 +123,27 @@ tap.test('display', function (test) {
 
         test_scene.end();
     });
+
+    test.test('materials', function (mt) {
+        var d1 = O3.display('d1');
+
+        var d2 = O3.display('d2');
+
+        var red = new THREE.Color();
+        red.setRGB(1, 0, 0);
+        O3.mat('foo', {color: red, opacity: 0.5});
+
+        mt.equal(d1.mat('foo').obj().color.getHex(), red.getHex(), 'foo color is red');
+
+        var bar = O3.mat('bar', {parent: 'foo'});
+        mt.equal(d1.mat('bar').obj().color.getHex(), red.getHex(), 'foo color is red');
+        mt.end();
+
+        var vey = O3.mat('vey', {parent: 'foo', opacity: 1});
+
+        mt.equal(d1.mat('vey').obj().opacity, 1, 'vey is opacity 1');
+        mt.equal(d1.mat('vey').obj().color.getHex(), red.getHex(), 'vey is red');
+    })
 
     test.end();
 

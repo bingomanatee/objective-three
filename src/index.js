@@ -10,9 +10,42 @@ var O3 = (function () {
     function _O3() {
         this.displays = {};
         this.state = 'NOT STARTED';
+        this._mats = {};
     };
 
     var _proto = {
+        mats: function(filter){
+            return filter ? _.where(_.values(this._mats), filter) : _.values(this._mats);
+        },
+
+        mat: function (name, params, value) {
+            if (!this._mats[name]) {
+                params = params || {};
+                _.extend( params, {context: this});
+                this._mats[name] = new MatProxy(name, params, this);
+                this._mats[name].addListener('refresh', function () {
+                    O3.update_mat(name);
+                })
+            } else if (params) {
+                if (_.isString(params)) {
+                    this._mats[name].set(params, value);
+                } else if (_.isObject(params)) {
+                    this._mats[name].set_params(params);
+                }
+            }
+
+            return this._mats[name];
+        },
+
+        update_mat: function (name) {
+            var mat = this.mat(name);
+
+            if (mat) {
+                _.each(this.displays, function (d) {
+                    d.update_mat(name);
+                })
+            }
+        },
 
         reset: function () {
             _.each(this.displays, function (d) {
@@ -70,6 +103,11 @@ var O3 = (function () {
                         configurable: true
                     }
                 });
+            },
+            rgb:      function (r, g, b) {
+                var c = new THREE.Color();
+                c.setRGB(r, g, b);
+                return c;
             }
         },
 

@@ -13,6 +13,8 @@ function Display(name, params) {
     this._scenes = {};
     this._cameras = {};
     this._objects = [];
+    this._mats = {};
+
     this.active = true;
     this.update_on_animate = true;
 
@@ -27,8 +29,10 @@ function Display(name, params) {
         }, this);
     }
 
-    this.on('resize', function () {
-        this.renderer.setSize(this.width(), this.height());
+    this.addListener('resized', function () {
+        if (this._renderer) {
+            this._renderer.setSize(this.width(), this.height());
+        }
         _.each(this._cameras, function (c) {
             if (c.aspect) {
                 c.aspect = this.width() / this.height();
@@ -43,17 +47,55 @@ O3.util.inherits(Display, EventEmitter);
 _.extend(
     Display.prototype, {
 
+        mats: function(filter){
+          return filter ? _.where(_.values(this._mats), filter) : _.values(this._mats);
+        },
+
+        mat: function (name, params, value) {
+            if (!this._mats[name]) {
+                if (params === false) {
+                    return null;
+                }
+                params = params || {};
+                _.extend(params, {context: this});
+                var p = new MatProxy(name, params);
+                this._mats[name] = p;
+                this._mats[name].addListener('refresh', function () {
+                    p.emit('refresh');
+                }.bind(this))
+            } else if (params) {
+                if (_.isString(params)) {
+                    this._mats[name].set(params, value);
+                } else if (_.isObject(params)) {
+                    this._mats[name].set_params(params);
+                }
+            }
+            return this._mats[name];
+        },
+
+        mat_values: function (name) {
+            return _.reduce(_.compact([
+                O3.mat(name).params(), local_mat(name).params()
+            ], function (o, p) {
+                return _.extend(o, p)
+            }, {}));
+
+        },
+
         add: function (object, scene) {
             this._objects.push(object);
 
             var s = this.scene(scene);
-            s.add(object.content);
+            s.add(object.obj());
             object.scene = s;
             object.parent = this;
         },
+        find: function(query){
+            return _.where(this._objects, query);
+        },
 
         remove: function (object) {
-            object.scene.remove(object.content);
+            object.scene.remove(object.obj());
             this._objects = _.reject(this._objects, function (o) {
                 return o === object;
             });
@@ -108,9 +150,8 @@ _.extend(
 
             if (renderer || !this._renderer) {
                 this._renderer = renderer || new THREE.WebGLRenderer();
+                this.renderer().setSize(this.width(), this.height());
             }
-
-            this._renderer.setSize(this.width(), this.height());
 
             return this._renderer;
         },
@@ -192,7 +233,7 @@ _.extend(
         update: function (from_ani) {
             _.each(this._objects, function (o) {
                 if ((!from_ani) || (o.update_on_animate)) {
-                    o.emit('update');
+                    o.emit('refresh');
                 }
             })
         },

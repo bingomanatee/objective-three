@@ -42,7 +42,7 @@ basis for animation. You can "scrub" time by changing the _start_time property o
 
 ## A sample O3 scene
 
-````
+```javascript
 
     (function () {
         var display = O3.display({width: 800, height: 500});

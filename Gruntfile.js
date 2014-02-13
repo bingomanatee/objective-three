@@ -4,7 +4,7 @@ module.exports = function (grunt) {
         concat:   {
             base:       {
                 files: {
-                    'build/objective-three.js': ['lib/vendor/node.events.js', 'src/index.js', 'src/Display.js', 'src/RenderObject.js']
+                    'build/objective-three.js': ['lib/vendor/node.events.js', 'src/index.js', 'src/Display.js','src/MatProxy.js', 'src/RenderObject.js']
                 }
             },
             test_scene: {
