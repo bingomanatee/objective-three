@@ -240,7 +240,7 @@ _.extend(
         update: function (from_ani) {
             _.each(this._objects, function (o) {
                 if ((!from_ani) || (o.update_on_animate)) {
-                    o.emit('refresh');
+                    o.emit('update');
                 }
             })
         },

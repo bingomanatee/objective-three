@@ -22,9 +22,9 @@ function RenderObject(obj, params) {
 
     var self = this;
 
-    self.addListener('refresh', function () {
+    self.addListener('update', function () {
         self.update();
-        self._cascade('refresh');
+        self._cascade('update');
     });
 
     _.extend(this, params);
@@ -63,7 +63,7 @@ _.extend(
         },
 
         update: function () {
-
+            // OVERRIDE FOR SYSTEM LOGIC HERE
         },
 
         add: function (ro) {
