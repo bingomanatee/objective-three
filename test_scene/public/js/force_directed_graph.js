@@ -13,7 +13,7 @@
         var display = O3.display(name, {width: window.innerWidth, height: window.innerHeight});
 
         // Putting the camera under renederObject management
-        var cam_obj = display.add(new O3.RenderObject(display.camera(), {name: 'camera'}));
+        var cam_obj = display.add(new O3.RenderObject(display.camera(), {name: 'camera_render_object', update_on_animate: false}));
         cam_obj.position(0, 0, 200);
 
         var cube_mesh = new THREE.CubeGeometry(SIZE, SIZE, SIZE);
@@ -125,6 +125,9 @@
     }
 
     var d1 = make_display('alpha');
+    var camera_object = d1.find({name: 'camera_display_object' })[0];
+
+
 
     // putting the content into the page
     d1.append(document.body);

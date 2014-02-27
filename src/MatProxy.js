@@ -96,6 +96,7 @@ _.extend(MatProxy.prototype, {
                 children = children.concat(d.mats({name: this.name}))
             }, this)
         }
+        return children;
     },
 
     obj: function () {

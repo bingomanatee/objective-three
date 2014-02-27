@@ -3,6 +3,7 @@
     <script language="javascript" src="js/three.js"></script>
     <script language="javascript" src="js/underscore-min.js"></script>
     <script language="javascript" src="js/o3.js"></script>
+    <script language="javascript" src="js/leap.skeleton.min.js"></script>
     <style>
         #count {
             position: absolute;
@@ -13,10 +14,44 @@
             padding: 0.5em;
             font-size: 200%;
         }
+        #hand-position{
+
+            position: absolute;
+            top: 8em;
+            right: 2em;
+            width: 10em;
+        }
+        #camera-angle{
+
+            position: absolute;
+            top: 16em;
+            right: 2em;
+            width: 10em;
+        }
     </style>
 </head>
 <body>
 <div id="count" ></div>
-<script language="javascript" src="js/force_directed_graph.js" defer="defer"></script>
+<div id="hand-position">
+    <p><b>Angle of hand</b></p>
+    <p> <input type="range" min="-1" max="1" step="0.2" disabled id="x-vector" />
+        <b>X</b></p>
+    <p> <input type="range" min="-1" max="1" step="0.2" disabled id="y-vector" />
+        <b>Y</b></p>
+    <p><input type="range" min="-1" max="1" step="0.2" disabled id="z-vector" />
+        <b>Z</b></p>
+</div>
+
+<div id="camera-angle">
+    <p><b>Angle of camera</b></p>
+    <p> <input type="range" min="-4" max="4" step="0.2" disabled id="x-a" />
+        <b>X</b></p>
+    <p> <input type="range" min="-4" max="4" step="0.2" disabled id="y-a" />
+        <b>Y</b></p>
+    <p><input type="range" min="-4" max="4" step="0.2" disabled id="z-a" />
+        <b>Z</b></p>
+</div>
+
+<script language="javascript" src="js/force_directed_graph_leap.js" defer="defer"></script>
 </body>
 </html>

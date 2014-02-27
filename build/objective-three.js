@@ -693,7 +693,7 @@ _.extend(
         update: function (from_ani) {
             _.each(this._objects, function (o) {
                 if ((!from_ani) || (o.update_on_animate)) {
-                    o.emit('refresh');
+                    o.emit('update');
                 }
             })
         },
@@ -813,6 +813,7 @@ _.extend(MatProxy.prototype, {
                 children = children.concat(d.mats({name: this.name}))
             }, this)
         }
+        return children;
     },
 
     obj: function () {
@@ -885,9 +886,9 @@ function RenderObject(obj, params) {
 
     var self = this;
 
-    self.addListener('refresh', function () {
+    self.addListener('update', function () {
         self.update();
-        self._cascade('refresh');
+        self._cascade('update');
     });
 
     _.extend(this, params);
@@ -926,7 +927,7 @@ _.extend(
         },
 
         update: function () {
-
+            // OVERRIDE FOR SYSTEM LOGIC HERE
         },
 
         add: function (ro) {
