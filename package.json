@@ -1,9 +1,8 @@
 {
-  "private": true,
   "name": "objective-three",
   "version": "0.0.1",
   "description": "a scene/multi-scene management system for three",
-  "main": "index.js",
+  "main": "o3.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -21,7 +20,8 @@
     "grunt": "~0.4.2",
     "tap": "~0.4.8",
     "grunt-umd": "~1.6.1",
-    "grunt-node-tap": "~0.1.52"
+    "grunt-node-tap": "~0.1.52",
+    "grunt-contrib-concat": "~0.3.0"
   },
   "dependencies": {
     "three": "~0.58.10",

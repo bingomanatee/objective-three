@@ -1,5 +1,5 @@
 var tap = require('tap');
-var O3 = require('./../build/o3');
+var O3 = require('./../o3');
 var _ = require('underscore');
 var THREE = require('three');
 

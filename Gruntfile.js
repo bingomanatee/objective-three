@@ -16,7 +16,7 @@ module.exports = function (grunt) {
         umd:      {
             all: {
                 src:            'build/objective-three.js',
-                dest:           'build/o3.js', // optional, if missing the src will be used
+                dest:           'o3.js', // optional, if missing the src will be used
                 template:       'unit', // optional; a template from templates subdir can be specified by name (e.g. 'umd');
                 // if missing the templates/umd.hbs file will be used
                 objectToExport: 'O3', // optional, internal object that will be exported
