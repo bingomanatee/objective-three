@@ -74,7 +74,7 @@ _.extend(
 
         remove: function (ro) {
             ro.parent = null;
-            this.obj.remove(ro.obj);
+            this.obj().remove(ro.obj);
         },
 
         detach: function () {
