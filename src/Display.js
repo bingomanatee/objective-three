@@ -95,6 +95,7 @@ _.extend(
 
         light: function(type, name){
             var ro = new RenderObject().light(type);
+            this.add(ro);
             return name ? ro.n(name) : ro;
         },
 
