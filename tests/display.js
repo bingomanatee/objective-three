@@ -143,7 +143,31 @@ tap.test('display', function (test) {
 
         mt.equal(d1.mat('vey').obj().opacity, 1, 'vey is opacity 1');
         mt.equal(d1.mat('vey').obj().color.getHex(), red.getHex(), 'vey is red');
-    })
+    });
+
+    test.test('ro sugar', function (ros) {
+
+        var d3 = O3.display('ro sugar');
+
+        var ro = d3.ro('foo');
+
+        ros.ok(ro instanceof O3.RenderObject, 'new renderObject created');
+        ros.equal(ro.name, 'foo', 'new ro is foo');
+
+        ro.n('bar');
+        ros.equal(ro.name, 'bar', 'renamed to bar');
+        ro.rgb(0,0,0);
+        ros.equal(ro.rgb().getStyle(), 'rgb(0,0,0)', 'start rgb is black');
+        ro.rgb(1, 0, 0);
+        ros.equal(ro.rgb().getStyle(), 'rgb(255,0,0)', 'set rgb to red');
+
+        var dirLight = d3.light('sun');
+
+        ros.ok(dirLight.obj() instanceof THREE.DirectionalLight, 'new dir light created');
+
+        ros.end();
+
+    });
 
     test.end();
 

@@ -1,6 +1,6 @@
 {
   "name": "objective-three",
-  "version": "0.0.1b",
+  "version": "0.0.2",
   "description": "a scene/multi-scene management system for three",
   "main": "o3.js",
   "scripts": {

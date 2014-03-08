@@ -14,14 +14,14 @@ var O3 = (function () {
     };
 
     var _proto = {
-        mats: function(filter){
+        mats: function (filter) {
             return filter ? _.where(_.values(this._mats), filter) : _.values(this._mats);
         },
 
         mat: function (name, params, value) {
             if (!this._mats[name]) {
                 params = params || {};
-                _.extend( params, {context: this});
+                _.extend(params, {context: this});
                 this._mats[name] = new MatProxy(name, params, this);
                 this._mats[name].addListener('refresh', function () {
                     O3.update_mat(name);
@@ -55,7 +55,7 @@ var O3 = (function () {
         },
 
         displays: {},
-        display:  function (name, params) {
+        display: function (name, params) {
             if (_.isObject(name)) {
                 params = name;
                 name = '';
@@ -71,7 +71,7 @@ var O3 = (function () {
                 this.emit('display', name, display);
             }
             return this.displays[name];
-        }, util:  {
+        }, util: {
             assign: function (target, field, value) {
                 var args = _.toArray(arguments);
 
@@ -97,14 +97,14 @@ var O3 = (function () {
                 ctor.super_ = superCtor;
                 ctor.prototype = Object.create(superCtor.prototype, {
                     constructor: {
-                        value:        ctor,
-                        enumerable:   false,
-                        writable:     true,
+                        value: ctor,
+                        enumerable: false,
+                        writable: true,
                         configurable: true
                     }
                 });
             },
-            rgb:      function (r, g, b) {
+            rgb: function (r, g, b) {
                 var c = new THREE.Color();
                 c.setRGB(r, g, b);
                 return c;
@@ -112,9 +112,18 @@ var O3 = (function () {
         },
 
         _start_time: 0,
-        _ani_time:   0,
-        time:        function () {
+        _ani_time: 0,
+        time: function () {
             return this._ani_time - this._start_time;
+        },
+
+        stop: function () {
+            this.paused = true;
+        },
+
+        start: function () {
+            this.paused = false;
+            this.animate();
         },
 
         animate: function () {
@@ -122,7 +131,9 @@ var O3 = (function () {
                 this._start_time = new Date().getTime();
             }
             this._ani_time = new Date().getTime();
-
+            if (this.paused) {
+                return;
+            }
             this.emit('animate', this.time());
             _.each(this.displays, function (display) {
                 display.animate(this.time());

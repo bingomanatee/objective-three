@@ -56,6 +56,7 @@ _.extend(
                 if (params === false) {
                     return null;
                 }
+
                 params = params || {};
                 _.extend(params, {context: this});
                 var p = new MatProxy(name, params);
@@ -82,20 +83,80 @@ _.extend(
 
         },
 
-        add:  function (object, scene) {
+        add: function (object, scene) {
             this._objects.push(object);
 
             var s = this.scene(scene);
             s.add(object.obj());
             object.scene = s;
-            object.parent = this;
+            object.display = this;
             return object;
         },
+
+        light: function(type, name){
+            var ro = new RenderObject().light(type);
+            return name ? ro.n(name) : ro;
+        },
+
+        ro: function () {
+            var name, geo, mat, mesh, light, update;
+
+            var args = _.toArray(arguments);
+
+            _.each(args, function (a) {
+                if (_.isString(a)) {
+                    name = a;
+                    return;
+                }
+                if (_.isObject(a)) {
+                    if (a instanceof THREE.Geometry) {
+                        geo = a;
+                        return;
+                    }
+                    if (a instanceof THREE.Material) {
+                        mat = a;
+                        return;
+                    }
+                    if (a instanceof THREE.Mesh) {
+                        mesh = a;
+                        return;
+                    }
+                    if (a instanceof THREE.Light) {
+                        light = a;
+                        return;
+                    }
+                }
+
+                if (_.isFunction(a)) {
+                    update = a;
+                }
+            });
+
+            if (mesh) {
+                if (geo) {
+                    mesh.setGeometry(geo);
+                }
+                if (mat) {
+                    mesh.setMaterial(mat);
+                }
+            }
+
+            mesh = mesh || light || new THREE.Mesh(geo, mat);
+
+            var ro = new RenderObject(mesh, update);
+            ro.name = name || 'ro #' + ro.id;
+            ro.display = this;
+
+            return ro;
+
+        },
+
         find: function (query) {
             return _.where(this._objects, query);
         },
-        objects: function(readonly){
-            return readonly? this._objects : this._objects.slice();
+
+        objects: function (readonly) {
+            return readonly ? this._objects : this._objects.slice();
         },
         remove: function (object) {
             object.scene.remove(object.obj());
@@ -127,7 +188,7 @@ _.extend(
                 var self = this;
                 this._cameras[name] = _.extend(value || new THREE.PerspectiveCamera(),
                     {
-                        name:     name,
+                        name: name,
                         activate: function () {
                             self._default_camera = this.name;
                         }
@@ -174,7 +235,7 @@ _.extend(
                 var self = this;
                 this._scenes[name] = _.extend(value || new THREE.Scene(),
                     {
-                        name:     name,
+                        name: name,
                         activate: function () {
                             self._default_scene = this.name;
                         }
@@ -245,6 +306,17 @@ _.extend(
             })
         },
 
+        /**
+         * render a single frame
+         */
+        render: function () {
+            this.renderer().render(this.scene(), this.camera());
+        },
+
+        /**
+         * render continuously
+         * @param t
+         */
         animate: function (t) {
             this.emit('animate', t);
             _.each(this.objects(1), function (o) {
@@ -255,7 +327,7 @@ _.extend(
                 if (this.update_on_animate) {
                     this.update(true);
                 }
-                this.renderer().render(this.scene(), this.camera());
+                this.render();
             }
         }
 

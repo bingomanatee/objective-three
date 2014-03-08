@@ -1,5 +1,3 @@
-
-
 function RenderObject(obj, params) {
     var def;
     if (_.isString(obj)) {
@@ -7,7 +5,7 @@ function RenderObject(obj, params) {
         obj = null;
     }
 
-    if (_.isFunction(params)){
+    if (_.isFunction(params)) {
         params = {
             update: params
         }
@@ -44,16 +42,84 @@ O3.util.inherits(RenderObject, EventEmitter);
 
 _.extend(
     RenderObject.prototype, {
+        /**
+         *
+         * @param mat {string || THREE.Material}
+         * @returns {RenderObject}
+         */
+        mat: function (mat) {
+            if (!mat) {
+                return this.obj() instanceof THREE.Mesh ? this.obj().material : false;
+            }
 
-        obj: function(o){
-            if(o){
-                this._obj = o;
+            if (_.isString(mat)) {
+                if (this.display) {
+                    mat = this.display.mat(mat).obj();
+                }
+            }
+
+            if ((this.obj() instanceof THREE.Mesh)) {
+                this.obj().setMaterial(mat);
+            }
+
+            return this;
+        },
+
+        n: function (n) {
+            this.name = n;
+            return this
+        },
+
+        geo: function (geo) {
+
+            if (!geo) {
+                return this.obj()instanceof  THREE.Mesh ? this.obj().geometry : false;
+            }
+            if (this.obj() instanceof THREE.Mesh) {
+                this.obj().setGeometry(geo);
+            }
+            return this;
+        },
+
+        obj: function (o) {
+            if (o) {
+                this.set_obj(obj);
             }
             return this._obj;
         },
 
-        set: function(key, value){
-            this.obj()[key] = value;
+        set_obj: function (obj) {
+            var children = this.children;
+
+            var parent;
+            _.each(children, function (child) {
+                this.remove(child);
+            });
+
+            if (this._obj && this._obj.parent) {
+                parent = this._obj.parent;
+                this._obj.parent.remove(this._obj);
+            }
+            this._obj = obj;
+            if (parent) {
+                parent.add(obj);
+            }
+            return this;
+        },
+
+        /**
+         * passes through single or multiple values to the object
+         * @param key
+         * @param value
+         */
+        set: function (key, value) {
+            if (_.isObject(key)) {
+                _.each(key, function (value, key) {
+                    this.set(key, value);
+                }.bind(this));
+            } else if (key && _.isString(key)) {
+                this.obj()[key] = value;
+            }
         },
 
         _cascade: function (event, data) {
@@ -72,9 +138,17 @@ _.extend(
             ro.parent = this;
         },
 
+        /**
+         * removes both the render object and its obj from the heirarchy
+         * @param ro
+         */
+
         remove: function (ro) {
             ro.parent = null;
             this.obj().remove(ro.obj());
+            this.children = _.reject(this.children, function (child) {
+                return child === ro;
+            })
         },
 
         detach: function () {
@@ -92,36 +166,78 @@ _.extend(
             return this;
         },
 
-        light: function (type) {
-            if (!type) {
-                type = 'point';
-            }
-            switch (type) {
-                case 'point':
-                    this.type = 'POINT_LIGHT';
-
-                    this.obj(new THREE.PointLight());
-                    break;
-
-                case 'directional':
-                case 'sun':
-                    this.obj(new THREE.DirectionalLight());
-                    break;
-
-                case 'ambient':
-                    this.obj(new THREE.AmbientLight());
-
-            }
-
+        rotX: function(v){
+            this.obj().rotateX(v);
             return this;
-
         },
 
+
+        rotY: function(v){
+            this.obj().rotateY(v);
+            return this;
+        },
+
+
+        rotZ: function(v){
+            this.obj().rotateZ(v);
+            return this;
+        },
+
+        transX: function(v){
+            this.obj().translateX(v);
+            return this;
+        },
+
+
+        transY: function(v){
+            this.obj().translateY(v);
+            return this;
+        },
+
+
+        transZ: function(v){
+            this.obj().translateZ(v);
+            return this;
+        },
+
+        light: function (type) {
+            var p = RenderObject.LIGHT_PROTOS[type || 'point'] || THREE.PointLight;
+            return this.set_obj(new p());
+        },
+
+        /**
+         * setting the RGB of the object. 
+         * To avoid side effects, the material is cloned the first time this method is called. 
+         * 
+         * @param r {number || Array || THREE.Color} (optional) if absent, the material color is returned unchanged.
+         * @param g {number} optional
+         * @param b {number} optional
+         * @returns {*}
+         */
         rgb: function (r, g, b) {
-            if (this.obj().color) {
-                this.obj().color.setRGB(r, g, b);
+            if (arguments.length < 1){
+                return this.obj().material.color;
             }
 
+            if (_.isArray(r)) {
+                b = r[2] || 0;
+                g = r[1] || 0;
+                r = r[0] || 0;
+            }
+            
+            if (!this.obj().material.__color_clone){
+                this.obj().material = this.obj().material.clone();
+                this.obj().material.__color_clone = true;
+                this.obj().material.__original_ro = this.id;
+            }
+            
+            if (this.obj().material.color) {
+                if (r instanceof THREE.Color) {
+                    this.obj().material.color = r;
+                } else {
+                    this.obj().material.color.setRGB(r, g, b);
+                }
+            }
             return this;
         },
 
@@ -135,18 +251,18 @@ _.extend(
 
         position: function (x, y, z) {
             var o = this.obj();
-            if (arguments.length){
+            if (arguments.length) {
 
-            if (!_.isNull(x) || (!_.isUndefined(x))) {
-                o.position.x = x;
-            }
+                if (!_.isNull(x) || (!_.isUndefined(x))) {
+                    o.position.x = x;
+                }
                 if (!_.isNull(y) || (!_.isUndefined(y))) {
-                o.position.y = y;
-            }
+                    o.position.y = y;
+                }
                 if (!_.isNull(z) || (!_.isUndefined(z))) {
-                o.position.z = z;
+                    o.position.z = z;
+                }
             }
-        }
 
             return o.position;
         },
@@ -157,3 +273,13 @@ _.extend(
     });
 
 O3.RenderObject = RenderObject;
+
+RenderObject.LIGHT_PROTOS = {
+    point: THREE.PointLight,
+    spot: THREE.SpotLight,
+    distance: THREE.DirectionalLight,
+    hemi: THREE.HemisphereLight,
+    sun: THREE.DirectionalLight,
+    ambient: THREE.AmbientLight,
+    area: THREE.AreaLight
+};
