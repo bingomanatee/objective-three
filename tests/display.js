@@ -161,6 +161,16 @@ tap.test('display', function (test) {
         ro.rgb(1, 0, 0);
         ros.equal(ro.rgb().getStyle(), 'rgb(255,0,0)', 'set rgb to red');
 
+        ros.equal(ro.obj().position.x, 0, 'ro is at 0 x');
+        ros.equal(ro.obj().position.y, 0, 'ro is at 0 y');
+        ros.equal(ro.obj().position.z, 0, 'ro is at 0 z');
+
+        ro.at(new THREE.Vector3(100, 200, 300));
+
+        ros.equal(ro.obj().position.x, 100, 'ro is at 100 x');
+        ros.equal(ro.obj().position.y, 200, 'ro is at 200 y');
+        ros.equal(ro.obj().position.z, 300, 'ro is at 300 z');
+
         var dirLight = d3.light('sun');
 
         ros.ok(dirLight.obj() instanceof THREE.DirectionalLight, 'new dir light created');

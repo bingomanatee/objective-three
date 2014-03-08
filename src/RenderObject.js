@@ -159,9 +159,14 @@ _.extend(
 
         at: function (x, y, z) {
             var o = this.obj();
-            o.position.x = x;
-            o.position.y = y;
-            o.position.z = z;
+
+            if (x instanceof THREE.Vector3){
+                o.position.copy(x);
+            } else {
+                o.position.x = x;
+                o.position.y = y;
+                o.position.z = z;
+            }
 
             return this;
         },

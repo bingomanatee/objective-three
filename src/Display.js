@@ -147,6 +147,8 @@ _.extend(
             ro.name = name || 'ro #' + ro.id;
             ro.display = this;
 
+            this.add(ro);
+
             return ro;
 
         },
