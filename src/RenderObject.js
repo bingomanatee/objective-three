@@ -59,7 +59,11 @@ _.extend(
             }
 
             if ((this.obj() instanceof THREE.Mesh)) {
-                this.obj().setMaterial(mat);
+                if (this.obj().setMaterial){
+                    this.obj().setMaterial(mat);
+                } else {
+                    this.obj().material = mat;
+                }
             }
 
             return this;
