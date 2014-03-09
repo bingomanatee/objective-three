@@ -133,15 +133,6 @@ _.extend(
                 }
             });
 
-            if (mesh) {
-                if (geo) {
-                    mesh.setGeometry(geo);
-                }
-                if (mat) {
-                    mesh.setMaterial(mat);
-                }
-            }
-
             mesh = mesh || light || new THREE.Mesh(geo, mat);
 
             var ro = new RenderObject(mesh, update);
