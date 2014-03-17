@@ -830,7 +830,6 @@ function MatProxy(name, params) {
         delete params.context;
     }
     this._params = params || {};
-
 }
 
 O3.util.inherits(MatProxy, EventEmitter);
@@ -1095,6 +1094,7 @@ _.extend(
             } else if (key && _.isString(key)) {
                 this.obj()[key] = value;
             }
+            return this;
         },
 
         _cascade: function (event, data) {
