@@ -80,7 +80,12 @@ _.extend(
                 return this.obj()instanceof  THREE.Mesh ? this.obj().geometry : false;
             }
             if (this.obj() instanceof THREE.Mesh) {
-                this.obj().setGeometry(geo);
+                if (this.obj.setGeometry){
+                    this.obj().setGeometry(geo);
+                } else {
+                    this.obj().geometry = geo;
+                    this.obj().updateMorphTargets();
+                }
             }
             return this;
         },
@@ -124,6 +129,7 @@ _.extend(
             } else if (key && _.isString(key)) {
                 this.obj()[key] = value;
             }
+            return this;
         },
 
         _cascade: function (event, data) {

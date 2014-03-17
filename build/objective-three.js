@@ -557,7 +557,7 @@ _.extend(
             return object;
         },
 
-        light: function(type, name){
+        light: function (type, name) {
             var ro = new RenderObject().light(type);
             this.add(ro);
             return name ? ro.n(name) : ro;
@@ -596,15 +596,6 @@ _.extend(
                     update = a;
                 }
             });
-
-            if (mesh) {
-                if (geo) {
-                    mesh.setGeometry(geo);
-                }
-                if (mat) {
-                    mesh.setMaterial(mat);
-                }
-            }
 
             mesh = mesh || light || new THREE.Mesh(geo, mat);
 
@@ -679,9 +670,11 @@ _.extend(
          */
         renderer: function (renderer) {
 
-            if (renderer || !this._renderer) {
-                this._renderer = renderer || new THREE.WebGLRenderer();
-                this.renderer().setSize(this.width(), this.height());
+            if (renderer) {
+                this._renderer = renderer;
+            } else if (!this._renderer) {
+                this._renderer = new THREE.WebGLRenderer();
+                this._renderer.setSize(this.width(), this.height());
             }
 
             return this._renderer;
@@ -725,7 +718,12 @@ _.extend(
         },
 
         append: function (parent) {
-            parent.appendChild(this.renderer().domElement);
+            var dom = this.renderer().domElement;
+
+            if (!dom) {
+                throw new Error('no domElement on renderer');
+            }
+            parent.appendChild(dom);
         },
 
         height: function (value, noEmit) {
@@ -774,10 +772,12 @@ _.extend(
         },
 
         /**
-         * render a single frame
+         *
+         * @param camera {Three.Camera} (optional)
+         * @param scene {Three.Scene} (optional)
          */
-        render: function () {
-            this.renderer().render(this.scene(), this.camera());
+        render: function (camera, scene) {
+            this.renderer().render(scene || this.scene(), camera || this.camera());
         },
 
         /**
@@ -815,6 +815,7 @@ function MatProxy(name, params) {
         delete params.context;
     }
     this._params = params || {};
+
 }
 
 O3.util.inherits(MatProxy, EventEmitter);
@@ -1009,7 +1010,11 @@ _.extend(
             }
 
             if ((this.obj() instanceof THREE.Mesh)) {
-                this.obj().setMaterial(mat);
+                if (this.obj().setMaterial){
+                    this.obj().setMaterial(mat);
+                } else {
+                    this.obj().material = mat;
+                }
             }
 
             return this;
@@ -1026,7 +1031,12 @@ _.extend(
                 return this.obj()instanceof  THREE.Mesh ? this.obj().geometry : false;
             }
             if (this.obj() instanceof THREE.Mesh) {
-                this.obj().setGeometry(geo);
+                if (this.obj.setGeometry){
+                    this.obj().setGeometry(geo);
+                } else {
+                    this.obj().geometry = geo;
+                    this.obj().updateMorphTargets();
+                }
             }
             return this;
         },
