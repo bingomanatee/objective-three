@@ -572,6 +572,8 @@ _.extend(
             return object;
         },
 
+        I_HAVE_LIGHT: true,
+
         light: function (type, name) {
             var ro = new RenderObject().light(type);
             this.add(ro);
@@ -579,7 +581,7 @@ _.extend(
         },
 
         ro: function () {
-            var name, geo, mat, mesh, light, update;
+            var name, geo, mat, mesh, light, update, params;
 
             var args = _.toArray(arguments);
 
@@ -605,16 +607,25 @@ _.extend(
                         light = a;
                         return;
                     }
+                    params = a;
+                    return;
                 }
 
                 if (_.isFunction(a)) {
-                    update = a;
+                    if (params) {
+                        params.update = a;
+                    } else {
+                        params = {
+                            update: a
+                        }
+                    }
+
                 }
             });
 
             mesh = mesh || light || new THREE.Mesh(geo, mat);
 
-            var ro = new RenderObject(mesh, update);
+            var ro = new RenderObject(mesh, params);
             ro.name = name || 'ro #' + ro.id;
             ro.display = this;
 
@@ -825,6 +836,9 @@ Display.PROPERTIES = [ 'width', 'height', 'camera', 'scene', 'renderer'];
 function MatProxy(name, params) {
     this.name = name;
     this.context = null;
+    if (_.isString(params)){
+        params = {type: params};
+    }
     if (params.context) {
         this.context = params.context;
         delete params.context;
@@ -839,6 +853,32 @@ _.extend(MatProxy.prototype, {
     set: function (prop, value) {
         this._params[prop] = value;
         this.update_obj();
+    },
+
+    color: function (r, g, b) {
+        switch (arguments.length) {
+            case 0:
+                if (!this._params.color) {
+                    this._params.color = new THREE.Color();
+                }
+                break;
+
+            case 1:
+                this._params.color = r.clone ? r.clone() : new THREE.Color(r);
+                break;
+
+            case 3:
+                this._params.color = new THREE.Color().setRGB(r, g, b);
+                break;
+
+            default:
+                throw new Error('write better code');
+        }
+
+        if (this._obj){
+            this.update_obj();
+        }
+        return this._params.color;
     },
 
     get: function (prop) {
@@ -895,22 +935,23 @@ _.extend(MatProxy.prototype, {
         return out;
     },
 
-    update_obj: function(){
-       if (this.context !== O3){
-           if (this._obj){
-               _.extend(this._obj, this.params());
-           }
-       }
+    update_obj: function () {
+        if (this.context !== O3) {
+            if (this._obj) {
+                _.extend(this._obj, this.params());
+            }
+        }
 
-        _.each(this.children(), function(c){
+        _.each(this.children(), function (c) {
             c.update_obj();
         });
     },
 
-    children: function(){
+    children: function () {
+        if (!this.context) return [];
         var children = this.context.mats({parent: this.name});
-        if (this.context == O3){
-            _.each(this.context.displays, function(d){
+        if (this.context == O3) {
+            _.each(this.context.displays, function (d) {
                 children = children.concat(d.mats({name: this.name}))
             }, this)
         }
@@ -928,7 +969,8 @@ _.extend(MatProxy.prototype, {
                 } else if (MatProxy.ALIASES[mat_values.type]) {
                     var name = MatProxy.ALIASES[mat_values.type];
                     if (THREE[name]) {
-                        this._obj = new THREE[name](mat_values);
+                        this._obj = new THREE[name]();
+                        this.update_obj();
                     } else {
                         throw new Error('cannot find material class ' + name);
                     }
@@ -953,16 +995,136 @@ _.extend(MatProxy.prototype, {
 });
 
 MatProxy.ALIASES = {
-    '':           'MeshBasicMaterial',
-    shader:       'ShaderMaterial',
+    '': 'MeshBasicMaterial',
+    shader: 'ShaderMaterial',
     spritecanvas: 'SpriteCanvasMaterial',
-    'sprite':     'SpriteMaterial'
+    'sprite': 'SpriteMaterial'
 };
 
 _.each('lambert,face,normal,phong,depth,basic'.split(','),
     function (base) {
         MatProxy.ALIASES[base] = MatProxy.ALIASES[base.toLowerCase()] = 'Mesh' + base.substr(0, 1).toUpperCase() + base.substr(1) + 'Material';
     });
+/**
+ * A Infinite monitors and reuses tiles to produce infinite spaces.
+ * @param name {string}
+ * @param params {Object}
+ * @constructor
+ */
+
+function Infinite(name, display, params) {
+    this.tile_size = 10; // the dimension of a single tile
+    this.range = 4; // the number of tiles out that Infinite redraws
+    this.dimensions = {
+        x: true, y: false, z: true
+    }; // by default, is a 2d planar mechanic
+
+    _.extend(this, params);
+    this.name = name;
+    this.display = display;
+
+    this.on('position', this.reposition.bind(this));
+}
+
+O3.util.inherits(Infinite, EventEmitter);
+
+_.extend(Infinite.prototype, {
+
+    reposition: function (center) {
+
+        _.each(this.display.find({tile: true}), function (ro) {
+            ro.active = false; // marking all tiles for reuse/garbage collection
+        });
+
+        // @TODO: validate that center is Vector3
+
+        var loop = Fools.loop(this.handle_tile.bind(this));
+
+        var i = 0, j = 0, k = 0;
+
+        if (this.dimensions.x) {
+            i = Math.round(center.x / this.tile_size);
+            loop.dim('i', i - this.range, i + this.range)
+        }
+
+        if (this.dimensions.y) {
+            j = Math.round(center.y / this.tile_size);
+            loop.dim('j', j - this.range, j + this.range)
+        }
+
+        if (this.dimensions.z) {
+            k = Math.round(center.z / this.tile_size);
+            loop.dim('k', k - this.range, k + this.range)
+        }
+
+        console.log('repositioning to ', i, j, k);
+
+        loop();
+    },
+
+    handle_tile: function (iter) {
+        var inactive_tiles = this.display.find({tile: true, active: false});
+        var old_tile_at = _.find(inactive_tiles, function (tile) {
+            if (iter.hasOwnProperty('i') && (iter.i != tile.i)) {
+                return false;
+            }
+            if (iter.hasOwnProperty('j') && (iter.j != tile.j)) {
+                return false;
+            }
+            if (iter.hasOwnProperty('k') && (iter.k != tile.k)) {
+                return false;
+            }
+            return true;
+        });
+
+        if (old_tile_at) {
+            console.log('old tile exists - not changing', iter);
+            old_tile_at.active = true;
+            return; // tile is in place -- don't do anything.
+        }
+        var tile;
+        if (inactive_tiles && inactive_tiles.length) {
+            tile = _.first(inactive_tiles);
+           // console.log('reusing ', tile);
+            this.update_tile(tile, iter);
+        } else {
+            tile = this.make_tile(iter);
+        }
+        tile.active = true;
+    },
+
+    tile_mat: function (iter) {
+        return 'infinite cube';
+    },
+
+    update_tile: function (tile, iter) {
+        //   console.log('reusing tile at', iter);
+        this.locate_tile(tile, iter).mat(this.tile_mat(iter));
+    },
+
+    new_tile: function (iter) {
+        console.log('making tile at', iter);
+        if (!this._cube_mesh) {
+            this._cube_mesh = new THREE.CubeGeometry(this.tile_size, this.tile_size, this.tile_size);
+        }
+        var tile = this.display.ro('tile ' + JSON.stringify(iter), {tile: true, active: true});
+        tile.geo(this._cube_mesh).mat(this.tile_mat(iter));
+        return tile;
+    },
+
+    locate_tile: function (tile, iter) {
+        return tile.at(( iter.i || 0) * this.tile_size, (iter.j | 0) * this.tile_size, (iter.k || 0) * this.tile_size);
+    },
+
+    make_tile: function (iter) {
+        var cube = _.first(this.display.find({tile: true, active: false})) || this.new_tile(iter);
+        this.locate_tile(cube, iter);
+        cube.active = true;
+        return cube;
+    }
+
+});
+O3.Infinite = Infinite;
 function RenderObject(obj, params) {
     var def;
     if (_.isString(obj)) {
@@ -1057,7 +1219,7 @@ _.extend(
 
         obj: function (o) {
             if (o) {
-                this.set_obj(obj);
+                this.set_obj(o);
             }
             return this._obj;
         },

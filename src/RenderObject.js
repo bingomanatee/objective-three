@@ -92,7 +92,7 @@ _.extend(
 
         obj: function (o) {
             if (o) {
-                this.set_obj(obj);
+                this.set_obj(o);
             }
             return this._obj;
         },

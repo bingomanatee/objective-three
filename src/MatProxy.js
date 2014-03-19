@@ -7,6 +7,9 @@
 function MatProxy(name, params) {
     this.name = name;
     this.context = null;
+    if (_.isString(params)){
+        params = {type: params};
+    }
     if (params.context) {
         this.context = params.context;
         delete params.context;
@@ -21,6 +24,32 @@ _.extend(MatProxy.prototype, {
     set: function (prop, value) {
         this._params[prop] = value;
         this.update_obj();
+    },
+
+    color: function (r, g, b) {
+        switch (arguments.length) {
+            case 0:
+                if (!this._params.color) {
+                    this._params.color = new THREE.Color();
+                }
+                break;
+
+            case 1:
+                this._params.color = r.clone ? r.clone() : new THREE.Color(r);
+                break;
+
+            case 3:
+                this._params.color = new THREE.Color().setRGB(r, g, b);
+                break;
+
+            default:
+                throw new Error('write better code');
+        }
+
+        if (this._obj){
+            this.update_obj();
+        }
+        return this._params.color;
     },
 
     get: function (prop) {
@@ -77,22 +106,23 @@ _.extend(MatProxy.prototype, {
         return out;
     },
 
-    update_obj: function(){
-       if (this.context !== O3){
-           if (this._obj){
-               _.extend(this._obj, this.params());
-           }
-       }
+    update_obj: function () {
+        if (this.context !== O3) {
+            if (this._obj) {
+                _.extend(this._obj, this.params());
+            }
+        }
 
-        _.each(this.children(), function(c){
+        _.each(this.children(), function (c) {
             c.update_obj();
         });
     },
 
-    children: function(){
+    children: function () {
+        if (!this.context) return [];
         var children = this.context.mats({parent: this.name});
-        if (this.context == O3){
-            _.each(this.context.displays, function(d){
+        if (this.context == O3) {
+            _.each(this.context.displays, function (d) {
                 children = children.concat(d.mats({name: this.name}))
             }, this)
         }
@@ -110,7 +140,8 @@ _.extend(MatProxy.prototype, {
                 } else if (MatProxy.ALIASES[mat_values.type]) {
                     var name = MatProxy.ALIASES[mat_values.type];
                     if (THREE[name]) {
-                        this._obj = new THREE[name](mat_values);
+                        this._obj = new THREE[name]();
+                        this.update_obj();
                     } else {
                         throw new Error('cannot find material class ' + name);
                     }
@@ -135,10 +166,10 @@ _.extend(MatProxy.prototype, {
 });
 
 MatProxy.ALIASES = {
-    '':           'MeshBasicMaterial',
-    shader:       'ShaderMaterial',
+    '': 'MeshBasicMaterial',
+    shader: 'ShaderMaterial',
     spritecanvas: 'SpriteCanvasMaterial',
-    'sprite':     'SpriteMaterial'
+    'sprite': 'SpriteMaterial'
 };
 
 _.each('lambert,face,normal,phong,depth,basic'.split(','),

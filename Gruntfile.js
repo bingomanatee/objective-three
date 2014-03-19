@@ -4,12 +4,17 @@ module.exports = function (grunt) {
         concat:   {
             base:       {
                 files: {
-                    'build/objective-three.js': ['lib/vendor/node.events.js', 'src/index.js', 'src/Display.js','src/MatProxy.js', 'src/RenderObject.js']
+                    'build/objective-three.js': ['lib/vendor/node.events.js',
+                        'src/index.js',
+                        'src/Display.js',
+                        'src/MatProxy.js',
+                        'src/Infinite.js',
+                        'src/RenderObject.js']
                 }
             },
             test_scene: {
                 files: {
-                    'test_scene/public/js/o3.js': ['build/o3.js']
+                    'test_scene/public/js/o3.js': ['o3.js']
                 }
             }
         },

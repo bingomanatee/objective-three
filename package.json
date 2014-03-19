@@ -21,10 +21,12 @@
     "tap": "~0.4.8",
     "grunt-umd": "~1.6.1",
     "grunt-node-tap": "~0.1.52",
-    "grunt-contrib-concat": "~0.3.0"
+    "grunt-contrib-concat": "~0.3.0",
+    "node-static": "~0.7.3"
   },
   "dependencies": {
     "three": "~0.58.10",
-    "underscore": "~1.6.0"
+    "underscore": "~1.6.0",
+    "fools": "0.0.8-b"
   }
 }

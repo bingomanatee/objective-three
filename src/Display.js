@@ -93,6 +93,8 @@ _.extend(
             return object;
         },
 
+        I_HAVE_LIGHT: true,
+
         light: function (type, name) {
             var ro = new RenderObject().light(type);
             this.add(ro);
@@ -100,7 +102,7 @@ _.extend(
         },
 
         ro: function () {
-            var name, geo, mat, mesh, light, update;
+            var name, geo, mat, mesh, light, update, params;
 
             var args = _.toArray(arguments);
 
@@ -126,16 +128,25 @@ _.extend(
                         light = a;
                         return;
                     }
+                    params = a;
+                    return;
                 }
 
                 if (_.isFunction(a)) {
-                    update = a;
+                    if (params) {
+                        params.update = a;
+                    } else {
+                        params = {
+                            update: a
+                        }
+                    }
+
                 }
             });
 
             mesh = mesh || light || new THREE.Mesh(geo, mat);
 
-            var ro = new RenderObject(mesh, update);
+            var ro = new RenderObject(mesh, params);
             ro.name = name || 'ro #' + ro.id;
             ro.display = this;
 
