@@ -108,6 +108,16 @@ var O3 = (function () {
                 var c = new THREE.Color();
                 c.setRGB(r, g, b);
                 return c;
+            },
+            /**
+             * will return a number with AT MOST d significant digits.
+             * @param n {float}
+             * @param d {int}
+             * @returns {number}
+             */
+            digits: function(n, d){
+                var power = Math.pow(10, d);
+                return Math.round(n * power)/power;
             }
         },
 

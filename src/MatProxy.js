@@ -154,6 +154,9 @@ _.extend(MatProxy.prototype, {
             }
         }
 
+        if (!this._obj.name){
+            this._obj.name = this.name;
+        }
         return this._obj;
     },
 
