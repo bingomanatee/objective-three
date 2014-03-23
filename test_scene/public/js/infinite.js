@@ -7,6 +7,9 @@
 
     display.append(document.body);
     display.mat('plane', 'basic').color(1, 0.5, 1);
+    display.scene().fog	= new THREE.FogExp2( 0xd0e0f0, 0.0125 );
+    display.renderer().setClearColorHex( 0xd0e0f0, 1 );
+
 
     var GRADS = 6;
 
@@ -17,13 +20,13 @@
     }).dim('i', 0, GRADS).dim('j', 0, GRADS).dim('k', 0, GRADS)();
 
     // a ground plane for reference
-    var plane = display.ro('ground_plane', new THREE.PlaneGeometry(500, 500)).mat('plane');
+  //  var plane = display.ro('ground_plane', new THREE.PlaneGeometry(500, 500)).mat('plane');
 
-    plane.rotX(Math.PI / -2);
+   // plane.rotX(Math.PI / -2);
     display.light('sun').at(0.1, 1, 0.5);
 
     var camera_ro = display.ro('camera_ro', function () {
-        this.transZ(-0.02);
+        this.transZ(0.1);
 
         var pos = this.obj().position.clone();
         pos.z += (-infinite.tile_size * infinite.range);
@@ -52,8 +55,8 @@
     }
 
     var infinite = new O3.Infinite('ground', display, {
-        range: 4,
-        tile_size: 15,
+        range: 30,
+        tile_size: 8,
         threshold: 1,
         locate_tile: function (tile, iter) {
             var y = (this.tile_size / 2) * Math.sin(Math.PI * (iter.i + iter.k) / 10);

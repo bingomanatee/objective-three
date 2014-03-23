@@ -36,6 +36,34 @@ tap.test('inactive', function (test) {
 
         ai.end();
     });
+    test.test('compress', function (c) {
+
+        var d = O3.display();
+
+        var infinite = new O3.Infinite('tiles', d, {
+            range: 4,
+            tile_size: 10,
+            threshold: 1
+        });
+
+        infinite.reposition(new THREE.Vector3());
+
+        infinite.compress();
+
+        var uncompressed = infinite._uncompressed_tiles();
+
+        c.equal(uncompressed.length, 0, 'no tiles have not been compressed');
+
+        infinite.center_ijk.k = 1;
+
+        infinite.on_change_center();
+
+        uncompressed = infinite._uncompressed_tiles();
+
+        console.log('second uncompressed tiles: ', uncompressed.length);
+
+        c.end();
+    });
 
     test.end();
 

@@ -12,7 +12,7 @@ function Infinite(name, display, params) {
         x: true, y: false, z: true
     }; // by default, is a 2d planar mechanic
     this.threshold = 1;
-    this.compression_factor = 2; // the number of tiles / per dimension to compress
+    this.compression_factor = 10; // the number of compression changes before purging
     _.extend(this, params);
     this.name = name;
     this.display = display;
@@ -35,7 +35,8 @@ _.extend(Infinite.prototype, {
         var o;
         try {
             o = JSON.parse(msg);
-        } catch (err) {
+        }
+        catch (err) {
             console.log('non JSON message from worker: ', msg);
             return;
         }
@@ -103,9 +104,7 @@ _.extend(Infinite.prototype, {
             this.update(center_xyz);
         }
 
-     /*   if (this.compression_factor > 1) {
-            this.compress();
-        }*/
+        this.compress();
     },
 
     _ijk_to_xyz: {i: 'x', j: 'y', k: 'z'},
@@ -141,9 +140,20 @@ _.extend(Infinite.prototype, {
         var old_center_ijk = this.center_ijk;
         this.center_ijk = new_center_ijk;
 
-        console.log('before deactivate: ',  this.active_tiles().length, 'active,', this.inactive_tiles().length, 'inactive');
+        _.each({x: 'i', y: 'j', z: 'k'}, function (ijk, dim) {
+            if (this.dimensions[dim]) {
+                this.center_ijk[ijk] = this['_c' + ijk](center_xyz);
+            }
+        }, this);
+
+        this.on_change_center();
+    },
+
+    on_change_center: function () {
+
+        //  console.log('before deactivate: ', this.active_tiles().length, 'active,', this.inactive_tiles().length, 'inactive');
         this.deactivate_distant();
-        console.log('after deactivate: ',  this.active_tiles().length, 'active,', this.inactive_tiles().length, 'inactive');
+        //  console.log('after deactivate: ', this.active_tiles().length, 'active,', this.inactive_tiles().length, 'inactive');
 
         var t = new Date().getTime();
 
@@ -176,7 +186,7 @@ _.extend(Infinite.prototype, {
 
         _.each({x: 'i', y: 'j', z: 'k'}, function (ijk, dim) {
             if (this.dimensions[dim]) {
-                var value = this.center_ijk[ijk] = this['_c' + ijk](center_xyz);
+                var value = this.center_ijk[ijk];
                 loop.dim(ijk)
                     .min(value - this.range)
                     .max(value + this.range);
@@ -187,19 +197,23 @@ _.extend(Infinite.prototype, {
 
         //    console.log('after looping: ',  this.active_tiles().length, 'active,', this.inactive_tiles().length, 'inactive');
 
-        console.log('reps: ', reps,
-            'updates: ', updates,
-            'tiles: ', this.tiles.length,
-            'tiles made: ', this._new_tiles,
-            'objects: ', this.display._objects.length,
-            'handle time: ', new Date().getTime() - t,
-            'index: ', ti2 - ti);
+        /*    console.log('reps: ', reps,
+         'updates: ', updates,
+         'tiles: ', this.tiles.length,
+         'tiles made: ', this._new_tiles,
+         'objects: ', this.display._objects.length,
+         'handle time: ', new Date().getTime() - t,
+         'index: ', ti2 - ti);*/
+
+        this._safety_cleanup();
+    },
+
+    _safety_cleanup: function () {
 
         var expected = Math.pow((2 * this.range + 1), this.dim_count());
-
         var ratio = this.tiles.length / expected;
 
-        console.log('expected:', expected, 'actual: ', this.tiles.length, 'ratio: ', ratio);
+        //    console.log('expected:', expected, 'actual: ', this.tiles.length, 'ratio: ', ratio);
         if (ratio > 1.2) {
             var inactive = this.inactive_tiles();
             _.each(inactive, this.display.remove.bind(this.display));
@@ -246,7 +260,7 @@ _.extend(Infinite.prototype, {
         var tiles = this.active_tiles();
         var t1 = new Date().getTime();
 
-        console.log(tiles.length, 'deactivating tiles too far from ', JSON.stringify(this.center_ijk));
+        //  console.log(tiles.length, 'deactivating tiles too far from ', JSON.stringify(this.center_ijk));
         _.each(tiles, function (tile) {
             var distance = _.reduce(this.dimensions, function (distance, active, xyz) {
                 if (!active || (distance > this.range)) {
@@ -269,19 +283,23 @@ _.extend(Infinite.prototype, {
         }, this);
         var t2 = new Date().getTime();
 
-       // console.log('getting active: ', t1 - t, 'deactivating: ', t2 - t1);
+        // console.log('getting active: ', t1 - t, 'deactivating: ', t2 - t1);
         return count;
+    },
+
+    _uncompressed_tiles: function () {
+        return _.reject(this.tiles, function (tile) {
+            return tile.comp;
+        });
     },
 
     compress: function () {
 
         var t = new Date().getTime();
 
-        var uncompressed_tiles = _.reject(this.tiles, function (tile) {
-            return tile.comp;
-        });
+        var uncompressed_tiles = this._uncompressed_tiles();
 
-        console.log('uncom: ', uncompressed_tiles.length);
+        // console.log('uncom: ', uncompressed_tiles.length);
         var by_group = _.groupBy(uncompressed_tiles, function (tile) {
             return tile.obj().material.name;
         }, this);
@@ -293,11 +311,30 @@ _.extend(Infinite.prototype, {
 
             var geo;
 
-            if (this._composites[name]) {
-                geo = this._composites[name].obj().geometry.clone();
-                this.display.remove(this._composites[name]);
+            var comp_count = 0;
+
+            var old_comp = this._composites[name];
+            if (old_comp) {
+
+                if (old_comp.comp_count < this.compression_factor) {
+                    geo = old_comp.obj().geometry.clone();
+                    comp_count = old_comp.comp_count;
+                    this.display.remove(this._composites[name]);
+                } else {
+                    console.log('purging material ', name);
+                    this.display.remove(old_comp);
+                    // we have done a reset of this composite
+                    // re-grab all the active tiles of this material
+                    mat_tiles = _.filter(this.tiles, function (tile) {
+                        return tile.obj().material.name == name;
+                    });
+
+
+                    geo = new THREE.Geometry();
+                }
             } else {
                 geo = new THREE.Geometry();
+
             }
 
             _.each(mat_tiles, function (t2) {
@@ -307,7 +344,8 @@ _.extend(Infinite.prototype, {
                 t2.set('visible', false);
             });
 
-            this._composites[name] = this.display.ro(name + '_merged', geo).mat(name);
+            this._composites[name] = this.display.ro(name + '_merged' + name, geo).mat(name);
+            this._composites[name].comp_count = ++comp_count;
 
         }, this);
 
@@ -356,7 +394,7 @@ _.extend(Infinite.prototype, {
      * @param iter {Object} ijk
      */
     handle_tile: function (iter) {
-        var inactive_tile = _.find(this.tiles, function(tile){
+        var inactive_tile = _.find(this.tiles, function (tile) {
             return !tile.active;
         });
 
@@ -407,11 +445,11 @@ _.extend(Infinite.prototype, {
             this._cube_geo = new THREE.CubeGeometry(this.tile_size, this.tile_size, this.tile_size);
         }
         var tile = this.display.ro('tile ' + JSON.stringify(iter),
-            _.extend({tile: true, active: true, created: new Date().getTime()}, iter));
+            _.extend({tile: true, active: true, update_on_animate: false, created: new Date().getTime()}, iter));
         tile.geo(this._cube_geo)
             .mat(this.tile_mat(iter));
 
-     //   console.log('obj.rotateX: %s', require('util').inspect(tile.obj()),  { showHidden: true, depth: 1 });
+        //   console.log('obj.rotateX: %s', require('util').inspect(tile.obj()),  { showHidden: true, depth: 1 });
         tile.rotX(Math.PI / -2);
         return tile;
     },
