@@ -23,7 +23,7 @@
     display.light('sun').at(0.1, 1, 0.5);
 
     var camera_ro = display.ro('camera_ro', function () {
-        this.transZ(-1);
+        this.transZ(-0.02);
 
         var pos = this.obj().position.clone();
         pos.z += (-infinite.tile_size * infinite.range);
@@ -52,13 +52,17 @@
     }
 
     var infinite = new O3.Infinite('ground', display, {
-        range: 20,
-        tile_size: 10,
-        threshold: 2,
+        range: 4,
+        tile_size: 15,
+        threshold: 1,
         locate_tile: function (tile, iter) {
             var y = (this.tile_size / 2) * Math.sin(Math.PI * (iter.i + iter.k) / 10);
-
-            return tile.at(( iter.i || 0) * this.tile_size, y, (iter.k || 0) * this.tile_size);
+            _.extend(tile, iter);
+            return tile.at(
+                ( iter.i || 0) * this.tile_size,
+                y,
+                (iter.k || 0) * this.tile_size
+            );
         },
 
         tile_mat: function (iter) {

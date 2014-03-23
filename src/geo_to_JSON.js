@@ -6,7 +6,7 @@ var _GEO_EXPORTER = new THREE.GeometryExporter();
  * for the best transmission to web workers / saving etc.
  * @param geo
  */
-O3.prototype.util.geo_to_JSON = function(geo){
+O3.util.geo_to_JSON = function(geo){
     var geo_data = _GEO_EXPORTER.parse(geo);
 
     var coordinates = _.reduce(geo_data.verticies, function(c, v){

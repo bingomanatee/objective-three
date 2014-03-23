@@ -25,8 +25,8 @@
     "node-static": "~0.7.3"
   },
   "dependencies": {
-    "three": "~0.58.10",
     "underscore": "~1.6.0",
-    "fools": "0.0.8-b"
+    "fools": "0.0.8-b",
+    "three": "~0.66.2"
   }
 }

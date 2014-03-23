@@ -6,7 +6,7 @@ module.exports = function (grunt) {
                 files: {
                     'build/objective-three.js': ['lib/vendor/node.events.js',
                         'src/index.js',
-                        'src/geo_to_JSON.js',
+                   //     'src/geo_to_JSON.js',
                         'src/Display.js',
                         'src/MatProxy.js',
                         'src/Infinite.js',
@@ -29,8 +29,8 @@ module.exports = function (grunt) {
                 amdModuleId:    'O3', // optional, if missing the AMD module will be anonymous
                 globalAlias:    'O3', // optional, changes the name of the global variable
                 deps:           { // optional
-                    'default': ['_', 'THREE'],
-                    cjs:       ['underscore', 'three']
+                    'default': ['_', 'THREE', 'Fools'],
+                    cjs:       ['underscore', 'three', 'fools']
                 }
             }
         },
