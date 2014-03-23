@@ -1146,9 +1146,6 @@ _.extend(Infinite.prototype, {
         // project a range along the greatest distance covered
         // that describes the extra overlap between the last position and the new one.
 
-        var max_value = 0;
-        var diff = 0;
-
         var new_center_ijk = _.reduce(this._ijk_to_xyz, function (new_center, xyz, ijk) {
             if (this.dimensions[xyz]) {
                 new_center[ijk] = this['_c' + ijk](center_xyz);
@@ -1175,7 +1172,7 @@ _.extend(Infinite.prototype, {
         this.deactivate_distant();
         //  console.log('after deactivate: ', this.active_tiles().length, 'active,', this.inactive_tiles().length, 'inactive');
 
-        var t = new Date().getTime();
+        //  var t = new Date().getTime();
 
         var reps = 0, updates = 0;
 
@@ -1183,7 +1180,7 @@ _.extend(Infinite.prototype, {
             return [tile.i || 0, tile.j || 0, tile.k || 0].join(' ');
         }
 
-        var ti = new Date().getTime();
+        //  var ti = new Date().getTime();
         var index = _.reduce(this.tiles, function (index, tile) {
             index[_index(tile)] = tile;
             return index;
@@ -1199,10 +1196,9 @@ _.extend(Infinite.prototype, {
                 this.handle_tile(iter);
             } else if (!index[key].active) {
                 index[key].active = true;
-                this._inactive_tiles = _.difference(this._inactive_tiles, [index[key]]);
             }
         }.bind(this));
-        var ti2 = new Date().getTime();
+        //  var ti2 = new Date().getTime();
 
         _.each({x: 'i', y: 'j', z: 'k'}, function (ijk, dim) {
             if (this.dimensions[dim]) {
@@ -1276,9 +1272,9 @@ _.extend(Infinite.prototype, {
     deactivate_distant: function () {
         var count = 0;
 
-        var t = new Date().getTime();
+        //    var t = new Date().getTime();
         var tiles = this.active_tiles();
-        var t1 = new Date().getTime();
+        //    var t1 = new Date().getTime();
 
         //  console.log(tiles.length, 'deactivating tiles too far from ', JSON.stringify(this.center_ijk));
         _.each(tiles, function (tile) {
@@ -1324,10 +1320,39 @@ _.extend(Infinite.prototype, {
             return tile.obj().material.name;
         }, this);
 
-        _.each(by_group, function (mat_tiles, name) {
-            if (mat_tiles.length < 2) {
-                return;
+        var t1 = new Date().getTime();
+
+        var self = this;
+        var groups = _.reduce(by_group, function (out, tiles, name) {
+
+            if (tiles.length < 2) {
+                return out;
+            };
+
+            var data = {
+                name:  name,
+                tiles: tiles,
+                count: 0
+            };
+
+            var compressed = self._composites[name];
+            if (compressed) {
+                data.count = compressed.comp_count;
             }
+
+            out.push(data);
+
+            return out;
+        }, []);
+
+        groups = _.sortBy(groups, 'count');
+
+        _.each(groups, function (data) {
+            var inc = new Date().getTime() - t;
+            if (inc > 10) return;
+            var name = data.name;
+            var mat_tiles = data.tiles;
+            console.log('compressing ', name, inc);
 
             var geo;
 
@@ -1349,7 +1374,6 @@ _.extend(Infinite.prototype, {
                         return tile.obj().material.name == name;
                     });
 
-
                     geo = new THREE.Geometry();
                 }
             } else {
@@ -1369,7 +1393,8 @@ _.extend(Infinite.prototype, {
 
         }, this);
 
-        console.log('compressed in ', new Date().getTime() - t, 'ms');
+        var n = new Date().getTime();
+        console.log('compressed in ', n - t, 'ms', '; group time is ', t1 - t);
 
     },
 
@@ -1408,18 +1433,26 @@ _.extend(Infinite.prototype, {
         return out;
     },
 
+    has_tile: function (iter) {
+        return true;
+    },
+
     /**
      *
      * create or recycle a tile
      * @param iter {Object} ijk
      */
     handle_tile: function (iter) {
+        if (!this.has_tile(iter)) {
+            return;
+        }
+        var mat = this.tile_mat(iter);
         var inactive_tile = _.find(this.tiles, function (tile) {
-            return !tile.active;
+            return (!tile.active) && (tile.obj().material.name == mat);
         });
 
         if (inactive_tile) {
-            this.update_tile(inactive_tile, iter);
+            this.reuse_tile(inactive_tile, iter);
             this.activate(inactive_tile);
         } else {
             this.tiles.push(this.make_tile(iter));
@@ -1445,10 +1478,18 @@ _.extend(Infinite.prototype, {
      * @param tile {RenderObject}
      * @param iter {Object} the ijk coordinate
      */
-    update_tile: function (tile, iter) {
+    reuse_tile: function (tile, iter) {
         tile.compressed = false;
-        this.locate_tile(tile, iter).mat(this.tile_mat(iter));
+        this.locate_tile(tile, iter);
+        this.emit('reuse', tile, iter);
         _.extend(tile, iter);
+    },
+
+    tile_geo: function (iter) {
+        if (!this._cube_geo) {
+            this._cube_geo = new THREE.CubeGeometry(this.tile_size, this.tile_size, this.tile_size);
+        }
+        return this._cube_geo;
     },
 
     /**
@@ -1461,16 +1502,10 @@ _.extend(Infinite.prototype, {
      */
     new_tile: function (iter) {
         ++this._new_tiles;
-        if (!this._cube_geo) {
-            this._cube_geo = new THREE.CubeGeometry(this.tile_size, this.tile_size, this.tile_size);
-        }
         var tile = this.display.ro('tile ' + JSON.stringify(iter),
             _.extend({tile: true, active: true, update_on_animate: false, created: new Date().getTime()}, iter));
-        tile.geo(this._cube_geo)
+        tile.geo(this.tile_geo(iter))
             .mat(this.tile_mat(iter));
-
-        //   console.log('obj.rotateX: %s', require('util').inspect(tile.obj()),  { showHidden: true, depth: 1 });
-        tile.rotX(Math.PI / -2);
         return tile;
     },
 
