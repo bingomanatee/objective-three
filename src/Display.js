@@ -224,7 +224,36 @@ _.extend(
                 this._renderer.setSize(this.width(), this.height());
             }
 
+            this._extend_renderer();
+
             return this._renderer;
+        },
+
+        _extend_renderer: function () {
+            if (!this._renderer._extended) {
+                _.extend(this._renderer,
+                    {
+                        _extended: 1,
+
+                        shadows: function (s, mode) {
+                            if (!arguments.length) {
+                                s = true;
+                            }
+
+                            this.shadowMapEnabled = s;
+
+                            if (typeof mode != 'undefined') {
+                                this.shadowMapType = mode || 0;
+                            }
+
+                            return this;
+                        }
+                    })
+            }
+        },
+
+        shadows: function (s, m) {
+            return this.renderer().shadows(s, m);
         },
 
         scene: function (name, value) {
@@ -345,6 +374,7 @@ _.extend(
             }
         }
 
-    });
+    })
+;
 
 Display.PROPERTIES = [ 'width', 'height', 'camera', 'scene', 'renderer'];

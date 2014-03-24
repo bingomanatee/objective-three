@@ -33,6 +33,10 @@ function RenderObject(obj, params) {
                 this.light(def[0]);
         }
     }
+
+    this.on('obj', this.mat_to_shadow.bind(this));
+    this.on('mat', this.mat_to_shadow.bind(this));
+
     this.id = ++RenderObject.__id;
 
 }
@@ -42,6 +46,112 @@ O3.util.inherits(RenderObject, EventEmitter);
 
 _.extend(
     RenderObject.prototype, {
+
+        mat_to_shadow: function () {
+            var mat_proxy = this.mat_proxy();
+
+            if (mat_proxy) {
+
+                this.shadows(mat_proxy.params().shadow);
+            }
+        },
+
+        shadows: function (shadow, params) {
+            switch (shadow) {
+                case 1:
+                case 'on':
+                case true:
+                    this.set({castShadow: true, receiveShadow: true});
+                    break;
+
+                case 'cast':
+                    this.set({castShadow: true, receiveShadow: false});
+                    break;
+
+                case 'receive':
+                    this.set({castShadow: false, receiveShadow: true});
+                    break;
+
+                default:
+                    this.set({castShadow: false, receiveShadow: false});
+
+            }
+
+            if (params) {
+                this.config_shadow(params);
+            }
+        },
+
+        config_shadow: function (params) {
+            var self = this;
+            var obj = this.obj();
+            if (obj instanceof THREE.Light) {
+                _.each(params, function (value, name) {
+                    var dir = /(left|right|near|far|top|bottom)$/i.exec(name);
+                    if (dir) {
+                        var ord = dir[1].toLowerCase();
+                        ord = 'shadowCamera' + ord.substr(0, 1).toUpperCase().concat(ord.substr(1));
+
+                        obj[ord] = value;
+                    } else {
+                        switch (name.toLowerCase()) {
+
+                            case 'cwidth':
+                                obj.shadowCameraLeft = -value;
+                                obj.shadowCameraRight = value;
+                                break;
+
+                            case 'cheight':
+                                obj.shadowCameraTop = value;
+                                obj.shadowCameraBottom = -value;
+                                break;
+
+                            case 'mwidth':
+                                obj.shadowMapWidth = value;
+                                break;
+
+                            case 'mheight':
+                                obj.shadowMapHeight = value;
+                                break;
+
+                            case 'shadow':
+                                self.shadow(value);
+                                break;
+
+                            default:
+                                console.log('unrecognized parameter ', name);
+                        }
+                    }
+
+                })
+            }
+
+            return this;
+        },
+
+        /**
+         * returns the material proxy for the object if it exists.
+         *
+         * @returns {O3.MatProxy || null}
+         */
+        mat_proxy: function () {
+            if (!this._mat_proxy) {
+                var obj = this.obj();
+                if (obj && obj instanceof THREE.Mesh) {
+                    if (obj.material && obj.material.name) {
+                        this._mat_proxy = obj.material.name;
+                        return this.get_mat();
+                    } else {
+                        return null;
+                    }
+                } else {
+                    return null;
+                }
+            } else {
+                return this.display.mat(this._mat_proxy);
+            }
+        },
+
         /**
          *
          * @param mat {string || THREE.Material}
@@ -53,19 +163,21 @@ _.extend(
             }
 
             if (_.isString(mat)) {
+                this._mat_proxy = mat;
                 if (this.display) {
                     mat = this.display.mat(mat).obj();
                 }
             }
 
             if ((this.obj() instanceof THREE.Mesh)) {
-                if (this.obj().setMaterial){
+                if (this.obj().setMaterial) {
                     this.obj().setMaterial(mat);
                 } else {
                     this.obj().material = mat;
                 }
             }
 
+            this.emit('mat');
             return this;
         },
 
@@ -80,7 +192,7 @@ _.extend(
                 return this.obj()instanceof  THREE.Mesh ? this.obj().geometry : false;
             }
             if (this.obj() instanceof THREE.Mesh) {
-                if (this.obj.setGeometry){
+                if (this.obj.setGeometry) {
                     this.obj().setGeometry(geo);
                 } else {
                     this.obj().geometry = geo;
@@ -113,6 +225,8 @@ _.extend(
             if (parent) {
                 parent.add(obj);
             }
+            this.emit('obj', obj);
+
             return this;
         },
 
@@ -170,7 +284,7 @@ _.extend(
         at: function (x, y, z) {
             var o = this.obj();
 
-            if (x instanceof THREE.Vector3){
+            if (x instanceof THREE.Vector3) {
                 o.position.copy(x);
             } else {
                 o.position.x = x;
@@ -181,36 +295,32 @@ _.extend(
             return this;
         },
 
-        rotX: function(v){
+        rotX: function (v) {
             this.obj().rotateX(v);
             return this;
         },
 
-
-        rotY: function(v){
+        rotY: function (v) {
             this.obj().rotateY(v);
             return this;
         },
 
-
-        rotZ: function(v){
+        rotZ: function (v) {
             this.obj().rotateZ(v);
             return this;
         },
 
-        transX: function(v){
+        transX: function (v) {
             this.obj().translateX(v);
             return this;
         },
 
-
-        transY: function(v){
+        transY: function (v) {
             this.obj().translateY(v);
             return this;
         },
 
-
-        transZ: function(v){
+        transZ: function (v) {
             this.obj().translateZ(v);
             return this;
         },
@@ -221,16 +331,16 @@ _.extend(
         },
 
         /**
-         * setting the RGB of the object. 
-         * To avoid side effects, the material is cloned the first time this method is called. 
-         * 
+         * setting the RGB of the object.
+         * To avoid side effects, the material is cloned the first time this method is called.
+         *
          * @param r {number || Array || THREE.Color} (optional) if absent, the material color is returned unchanged.
          * @param g {number} optional
          * @param b {number} optional
          * @returns {*}
          */
         rgb: function (r, g, b) {
-            if (arguments.length < 1){
+            if (arguments.length < 1) {
                 return this.obj().material.color;
             }
 
@@ -239,13 +349,13 @@ _.extend(
                 g = r[1] || 0;
                 r = r[0] || 0;
             }
-            
-            if (!this.obj().material.__color_clone){
+
+            if (!this.obj().material.__color_clone) {
                 this.obj().material = this.obj().material.clone();
                 this.obj().material.__color_clone = true;
                 this.obj().material.__original_ro = this.id;
             }
-            
+
             if (this.obj().material.color) {
                 if (r instanceof THREE.Color) {
                     this.obj().material.color = r;

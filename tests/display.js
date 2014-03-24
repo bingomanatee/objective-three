@@ -156,7 +156,7 @@ tap.test('display', function (test) {
 
         ro.n('bar');
         ros.equal(ro.name, 'bar', 'renamed to bar');
-        ro.rgb(0,0,0);
+        ro.rgb(0, 0, 0);
         ros.equal(ro.rgb().getStyle(), 'rgb(0,0,0)', 'start rgb is black');
         ro.rgb(1, 0, 0);
         ros.equal(ro.rgb().getStyle(), 'rgb(255,0,0)', 'set rgb to red');
@@ -177,6 +177,30 @@ tap.test('display', function (test) {
 
         ros.end();
 
+    });
+
+    test.test('material to shadow', function (mts) {
+
+        var ds = O3.display('s1');
+
+        ds.mat('shadow white', {shadow: 1});
+        ds.mat('no shadow black').color(0, 0, 0);
+
+        var obj = ds.ro('cube').geo(new THREE.CubeGeometry(1, 1, 1)).mat('shadow white').obj();
+        var o2 = ds.ro('cube black').geo(new THREE.CubeGeometry(1, 1, 1)).mat('no shadow black').obj();
+
+        mts.ok(obj.castShadow, 'obj casts shadow from mat');
+        mts.ok(!o2.castShadow, 'o2 does not cast shadow from mat');
+
+        var sun = ds.light('sun');
+
+        mts.ok(sun.obj().shadowCameraLeft != -20, 'shadow camera l not starting at -20');
+        sun.config_shadow({left: -20, right: 20, cheight: 50});
+        mts.equal(sun.obj().shadowCameraLeft, -20, 'shadow camera l set to -20');
+        mts.equal(sun.obj().shadowCameraTop, 50, 'shadow camera t set to 50');
+        mts.equal(sun.obj().shadowCameraBottom, -50, 'shadow camera b set to -50');
+
+        mts.end();
     });
 
     test.end();

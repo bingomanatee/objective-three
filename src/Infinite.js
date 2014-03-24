@@ -13,6 +13,7 @@ function Infinite(name, display, params) {
     }; // by default, is a 2d planar mechanic
     this.threshold = 1;
     this.compression_factor = 10; // the number of compression changes before purging
+    this.compression_throttle_cooldown = 200;
     _.extend(this, params);
     this.name = name;
     this.display = display;
@@ -293,6 +294,10 @@ _.extend(Infinite.prototype, {
 
         var t = new Date().getTime();
 
+        if (this.compress_time && (t - this.compress_time < this.compression_throttle_cooldown)){
+            return;
+        }
+
         var uncompressed_tiles = this._uncompressed_tiles();
 
         // console.log('uncom: ', uncompressed_tiles.length);
@@ -372,7 +377,8 @@ _.extend(Infinite.prototype, {
                 t2.set('visible', false);
             });
 
-            this._composites[name] = this.display.ro(name + '_merged' + name, geo).mat(name);
+            this._composites[name] = this.display.ro(name + '_merged' + name, geo);
+            this._composites[name].mat(name);
             this._composites[name].comp_count = ++comp_count;
 
         }, this);

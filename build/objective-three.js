@@ -698,7 +698,36 @@ _.extend(
                 this._renderer.setSize(this.width(), this.height());
             }
 
+            this._extend_renderer();
+
             return this._renderer;
+        },
+
+        _extend_renderer: function () {
+            if (!this._renderer._extended) {
+                _.extend(this._renderer,
+                    {
+                        _extended: 1,
+
+                        shadows: function (s, mode) {
+                            if (!arguments.length) {
+                                s = true;
+                            }
+
+                            this.shadowMapEnabled = s;
+
+                            if (typeof mode != 'undefined') {
+                                this.shadowMapType = mode || 0;
+                            }
+
+                            return this;
+                        }
+                    })
+            }
+        },
+
+        shadows: function (s, m) {
+            return this.renderer().shadows(s, m);
         },
 
         scene: function (name, value) {
@@ -819,7 +848,8 @@ _.extend(
             }
         }
 
-    });
+    })
+;
 
 Display.PROPERTIES = [ 'width', 'height', 'camera', 'scene', 'renderer'];
 /**
@@ -1018,6 +1048,7 @@ function Infinite(name, display, params) {
     }; // by default, is a 2d planar mechanic
     this.threshold = 1;
     this.compression_factor = 10; // the number of compression changes before purging
+    this.compression_throttle_cooldown = 200;
     _.extend(this, params);
     this.name = name;
     this.display = display;
@@ -1298,6 +1329,10 @@ _.extend(Infinite.prototype, {
 
         var t = new Date().getTime();
 
+        if (this.compress_time && (t - this.compress_time < this.compression_throttle_cooldown)){
+            return;
+        }
+
         var uncompressed_tiles = this._uncompressed_tiles();
 
         // console.log('uncom: ', uncompressed_tiles.length);
@@ -1332,9 +1367,13 @@ _.extend(Infinite.prototype, {
 
         groups = _.sortBy(groups, 'count');
 
+        this.compress_time = 0;
         _.each(groups, function (data) {
             var inc = new Date().getTime() - t;
-            if (inc > 10) return;
+            if (inc > 10) {
+                this.compress_time = t;
+                return;
+            }
             var name = data.name;
             var mat_tiles = data.tiles;
             console.log('compressing ', name, inc);
@@ -1373,7 +1412,8 @@ _.extend(Infinite.prototype, {
                 t2.set('visible', false);
             });
 
-            this._composites[name] = this.display.ro(name + '_merged' + name, geo).mat(name);
+            this._composites[name] = this.display.ro(name + '_merged' + name, geo);
+            this._composites[name].mat(name);
             this._composites[name].comp_count = ++comp_count;
 
         }, this);
@@ -1562,6 +1602,10 @@ function RenderObject(obj, params) {
                 this.light(def[0]);
         }
     }
+
+    this.on('obj', this.mat_to_shadow.bind(this));
+    this.on('mat', this.mat_to_shadow.bind(this));
+
     this.id = ++RenderObject.__id;
 
 }
@@ -1571,6 +1615,112 @@ O3.util.inherits(RenderObject, EventEmitter);
 
 _.extend(
     RenderObject.prototype, {
+
+        mat_to_shadow: function () {
+            var mat_proxy = this.mat_proxy();
+
+            if (mat_proxy) {
+
+                this.shadows(mat_proxy.params().shadow);
+            }
+        },
+
+        shadows: function (shadow, params) {
+            switch (shadow) {
+                case 1:
+                case 'on':
+                case true:
+                    this.set({castShadow: true, receiveShadow: true});
+                    break;
+
+                case 'cast':
+                    this.set({castShadow: true, receiveShadow: false});
+                    break;
+
+                case 'receive':
+                    this.set({castShadow: false, receiveShadow: true});
+                    break;
+
+                default:
+                    this.set({castShadow: false, receiveShadow: false});
+
+            }
+
+            if (params) {
+                this.config_shadow(params);
+            }
+        },
+
+        config_shadow: function (params) {
+            var self = this;
+            var obj = this.obj();
+            if (obj instanceof THREE.Light) {
+                _.each(params, function (value, name) {
+                    var dir = /(left|right|near|far|top|bottom)$/i.exec(name);
+                    if (dir) {
+                        var ord = dir[1].toLowerCase();
+                        ord = 'shadowCamera' + ord.substr(0, 1).toUpperCase().concat(ord.substr(1));
+
+                        obj[ord] = value;
+                    } else {
+                        switch (name.toLowerCase()) {
+
+                            case 'cwidth':
+                                obj.shadowCameraLeft = -value;
+                                obj.shadowCameraRight = value;
+                                break;
+
+                            case 'cheight':
+                                obj.shadowCameraTop = value;
+                                obj.shadowCameraBottom = -value;
+                                break;
+
+                            case 'mwidth':
+                                obj.shadowMapWidth = value;
+                                break;
+
+                            case 'mheight':
+                                obj.shadowMapHeight = value;
+                                break;
+
+                            case 'shadow':
+                                self.shadow(value);
+                                break;
+
+                            default:
+                                console.log('unrecognized parameter ', name);
+                        }
+                    }
+
+                })
+            }
+
+            return this;
+        },
+
+        /**
+         * returns the material proxy for the object if it exists.
+         *
+         * @returns {O3.MatProxy || null}
+         */
+        mat_proxy: function () {
+            if (!this._mat_proxy) {
+                var obj = this.obj();
+                if (obj && obj instanceof THREE.Mesh) {
+                    if (obj.material && obj.material.name) {
+                        this._mat_proxy = obj.material.name;
+                        return this.get_mat();
+                    } else {
+                        return null;
+                    }
+                } else {
+                    return null;
+                }
+            } else {
+                return this.display.mat(this._mat_proxy);
+            }
+        },
+
         /**
          *
          * @param mat {string || THREE.Material}
@@ -1582,19 +1732,21 @@ _.extend(
             }
 
             if (_.isString(mat)) {
+                this._mat_proxy = mat;
                 if (this.display) {
                     mat = this.display.mat(mat).obj();
                 }
             }
 
             if ((this.obj() instanceof THREE.Mesh)) {
-                if (this.obj().setMaterial){
+                if (this.obj().setMaterial) {
                     this.obj().setMaterial(mat);
                 } else {
                     this.obj().material = mat;
                 }
             }
 
+            this.emit('mat');
             return this;
         },
 
@@ -1609,7 +1761,7 @@ _.extend(
                 return this.obj()instanceof  THREE.Mesh ? this.obj().geometry : false;
             }
             if (this.obj() instanceof THREE.Mesh) {
-                if (this.obj.setGeometry){
+                if (this.obj.setGeometry) {
                     this.obj().setGeometry(geo);
                 } else {
                     this.obj().geometry = geo;
@@ -1642,6 +1794,8 @@ _.extend(
             if (parent) {
                 parent.add(obj);
             }
+            this.emit('obj', obj);
+
             return this;
         },
 
@@ -1699,7 +1853,7 @@ _.extend(
         at: function (x, y, z) {
             var o = this.obj();
 
-            if (x instanceof THREE.Vector3){
+            if (x instanceof THREE.Vector3) {
                 o.position.copy(x);
             } else {
                 o.position.x = x;
@@ -1710,36 +1864,32 @@ _.extend(
             return this;
         },
 
-        rotX: function(v){
+        rotX: function (v) {
             this.obj().rotateX(v);
             return this;
         },
 
-
-        rotY: function(v){
+        rotY: function (v) {
             this.obj().rotateY(v);
             return this;
         },
 
-
-        rotZ: function(v){
+        rotZ: function (v) {
             this.obj().rotateZ(v);
             return this;
         },
 
-        transX: function(v){
+        transX: function (v) {
             this.obj().translateX(v);
             return this;
         },
 
-
-        transY: function(v){
+        transY: function (v) {
             this.obj().translateY(v);
             return this;
         },
 
-
-        transZ: function(v){
+        transZ: function (v) {
             this.obj().translateZ(v);
             return this;
         },
@@ -1750,16 +1900,16 @@ _.extend(
         },
 
         /**
-         * setting the RGB of the object. 
-         * To avoid side effects, the material is cloned the first time this method is called. 
-         * 
+         * setting the RGB of the object.
+         * To avoid side effects, the material is cloned the first time this method is called.
+         *
          * @param r {number || Array || THREE.Color} (optional) if absent, the material color is returned unchanged.
          * @param g {number} optional
          * @param b {number} optional
          * @returns {*}
          */
         rgb: function (r, g, b) {
-            if (arguments.length < 1){
+            if (arguments.length < 1) {
                 return this.obj().material.color;
             }
 
@@ -1768,13 +1918,13 @@ _.extend(
                 g = r[1] || 0;
                 r = r[0] || 0;
             }
-            
-            if (!this.obj().material.__color_clone){
+
+            if (!this.obj().material.__color_clone) {
                 this.obj().material = this.obj().material.clone();
                 this.obj().material.__color_clone = true;
                 this.obj().material.__original_ro = this.id;
             }
-            
+
             if (this.obj().material.color) {
                 if (r instanceof THREE.Color) {
                     this.obj().material.color = r;

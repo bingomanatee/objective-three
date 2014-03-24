@@ -3,26 +3,30 @@
     /**
      * Basic setup of O3 scene
      */
-    var display = O3.display('infiinite display', {width: window.innerWidth, height: window.innerHeight});
+    var display = O3.display('infinite display', {width: window.innerWidth, height: window.innerHeight});
 
     display.append(document.body);
     display.scene().fog = new THREE.FogExp2(0xd0e0f0, 0.005);
-    display.renderer().setClearColorHex(0xd0e0f0, 1);
+    // display.renderer(new THREE.WebGLDeferredRenderer({scale: 1, width: window.innerWidth, height: window.innerHeight}));
+    display.shadows(true);
 
     var GRADS = 6;
 
-    display.mat('building', {type: 'phong'}).color(0.8, 0.8, 1);
-    display.mat('house',{parent: 'building'}).color(1, 0, 0);
-    display.mat('apt',{parent: 'building'}).color(0.33, 0.4, 0);
-    display.mat('tower',{parent: 'building'}).color(0.25, 0.25, 0.33);
-    display.mat('skyscraper',{parent: 'building'}).color(0.2, 0.2, 0.3);
-    display.mat('road', {type: 'lambert'}).color(0, 0.2, 0.4);
+    display.mat('building', {type: 'phong', shadow: 1}).color(0.8, 0.8, 1);
+    display.mat('house',{parent: 'building', shadow: 1}).color(0.25, 0, 0);
+    display.mat('apt',{parent: 'building', shadow: 1}).color(0.13, 0.2, 0);
+    display.mat('tower',{parent: 'building', shadow: 1}).color(0.25, 0.25, 0.33);
+    display.mat('skyscraper',{parent: 'building', shadow: 1}).color(0.2, 0.2, 0.3);
+    display.mat('road', {type: 'lambert', shadow: 1}).color(0, 0.2, 0.4);
 
     // a ground plane for reference
     var plane = display.ro('ground_plane', new THREE.PlaneGeometry(5000, 5000)).mat('road');
+    plane.shadows(true);
 
     plane.rotX(Math.PI / -2);
-    display.light('sun').at(0.1, 1, 0.5);
+    display.light('sun')
+        .at(0.1, 1, 0.5)
+        .shadows(true, {cheight: 5000, cwidth: 5000, mheight: 1024, mwidth: 1024});
 
     var camera_ro = display.ro('camera_ro', function () {
         this.transZ(-0.5);
@@ -55,7 +59,7 @@
 
     var infinite = new O3.Infinite('ground', display, {
         range:     25,
-        tile_size: 15,
+        tile_size: 10,
         threshold: 1,
 
         compression_factor: 2,
