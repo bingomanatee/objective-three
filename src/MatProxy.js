@@ -57,7 +57,6 @@ _.extend(MatProxy.prototype, {
     },
 
     set_params: function (props) {
-        console.log('setting params of ', this.name, this.context, 'to', props);
         _.extend(this._params, props);
         this.update_obj();
     },

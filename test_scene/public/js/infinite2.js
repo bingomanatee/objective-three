@@ -29,7 +29,7 @@
         .shadows(true, {cheight: 5000, cwidth: 5000, mheight: 1024, mwidth: 1024});
 
     var camera_ro = display.ro('camera_ro', function () {
-        this.transZ(-0.5);
+        this.transZ(2);
 
         var pos = this.obj().position.clone();
         pos.z += (-infinite.tile_size * infinite.range);
@@ -48,6 +48,11 @@
      *
      */
 
+    function _pyrimid(n){
+        var index = Math.abs(n);
+        return index;
+    }
+
         // while not a requirement we are naming tiles based on their initial placement for debugging.
     function _color_name(iter) {
         iter = _.extend({i: 0, j: 0, k: 0}, iter);
@@ -59,7 +64,7 @@
 
     var infinite = new O3.Infinite('ground', display, {
         range:     25,
-        tile_size: 10,
+        tile_size: 5,
         threshold: 1,
 
         compression_factor: 2,
@@ -67,7 +72,8 @@
         meshes: [],
 
         tile_height: function (iter) {
-            return Math.min(5, 3 + Math.floor(3 * Math.sin(iter.i * Math.PI / 7) - 4 * Math.cos(iter.k * Math.PI / 4)));
+            var out =  _pyrimid(iter.i);
+            return out;
         },
 
         has_tile: function (iter) {
@@ -80,7 +86,7 @@
                 if (!this.meshes[height]) {
                     this.meshes[height] = new THREE.CubeGeometry(this.tile_size, this.tile_size * height * 2, this.tile_size);
                 }
-                return  this.meshes[height];
+                return this.meshes[height];
             } else {
                 return new THREE.Object3D();
             }

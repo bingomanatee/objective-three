@@ -911,7 +911,6 @@ _.extend(MatProxy.prototype, {
     },
 
     set_params: function (props) {
-        console.log('setting params of ', this.name, this.context, 'to', props);
         _.extend(this._params, props);
         this.update_obj();
     },
@@ -1049,14 +1048,16 @@ function Infinite(name, display, params) {
     this.threshold = 1;
     this.compression_factor = 10; // the number of compression changes before purging
     this.compression_throttle_cooldown = 200;
+    this.min_vert_count_to_compress = 30;
     _.extend(this, params);
     this.name = name;
     this.display = display;
 
     this.tiles = [];
-    this._composites = {};
+    this._composites = [];
 
     this.on('position', this.reposition.bind(this));
+    this.display.mat('red', {type: 'phong'}).color(1, 0, 0);
 
     this.center = {};
     this.center_ijk = {};
@@ -1140,7 +1141,7 @@ _.extend(Infinite.prototype, {
             this.update(center_xyz);
         }
 
-        this.compress();
+       // this.compress();
     },
 
     _ijk_to_xyz: {i: 'x', j: 'y', k: 'z'},
@@ -1325,101 +1326,144 @@ _.extend(Infinite.prototype, {
         });
     },
 
+    _compress_tiles: function (tiles, mat) {
+        var geo = new THREE.Geometry();
+
+        _.each(tiles, function (tile) {
+            THREE.GeometryUtils.merge(geo, tile.obj());
+            tile.comp = true;
+            this.display.remove(tile);
+        }, this);
+
+        this._composites.push(this.display.ro().geo(geo).mat('red'));
+    },
+
+    _compression_groups: function () {
+        var tiles = this._uncompressed_tiles();
+
+        var groups = _.groupBy(tiles, function (tile) {
+            return tile.obj().material.name;
+        });
+
+        var data = _.sortBy(_.map(groups, function (group_tiles, name) {
+            return {tiles: group_tiles, mat: name, count: _.reduce(tiles, function (o, tile) {
+                return tile.obj().geometry.vertices.length + o;
+            }, 0)}
+        }), 'count');
+        return data;
+    },
+
     compress: function () {
-
         var t = new Date().getTime();
-
-        if (this.compress_time && (t - this.compress_time < this.compression_throttle_cooldown)){
+        if (this.compress_time && (t - this.compress_time < this.compression_throttle_cooldown)) {
             return;
         }
 
-        var uncompressed_tiles = this._uncompressed_tiles();
+        var tiles = this._compression_groups();
+        if (!tiles.length) {
+            return;
+        }
 
-        // console.log('uncom: ', uncompressed_tiles.length);
-        var by_group = _.groupBy(uncompressed_tiles, function (tile) {
-            return tile.obj().material.name;
-        }, this);
+        var last = tiles.pop();
+        if (last.count >= this.min_vert_count_to_compress) {
+            this._compress_tiles(last.tiles, last.mat);
+            this.compress_time = t;
+        }
 
-        var t1 = new Date().getTime();
+        /*
 
-        var self = this;
-        var groups = _.reduce(by_group, function (out, tiles, name) {
 
-            if (tiles.length < 2) {
-                return out;
-            };
+         var uncompressed_tiles = this._uncompressed_tiles();
 
-            var data = {
-                name:  name,
-                tiles: tiles,
-                count: 0
-            };
+         // console.log('uncom: ', uncompressed_tiles.length);
+         var by_group = _.groupBy(uncompressed_tiles, function (tile) {
+         return tile.obj().material.name;
+         }, this);
 
-            var compressed = self._composites[name];
-            if (compressed) {
-                data.count = compressed.comp_count;
-            }
+         var t1 = new Date().getTime();
 
-            out.push(data);
+         var self = this;
+         var groups = _.reduce(by_group, function (out, tiles, name) {
 
-            return out;
-        }, []);
+         if (tiles.length < 2) {
+         return out;
+         };
 
-        groups = _.sortBy(groups, 'count');
+         var data = {
+         name:  name,
+         tiles: tiles,
+         count: 0
+         };
 
-        this.compress_time = 0;
-        _.each(groups, function (data) {
-            var inc = new Date().getTime() - t;
-            if (inc > 10) {
-                this.compress_time = t;
-                return;
-            }
-            var name = data.name;
-            var mat_tiles = data.tiles;
-            console.log('compressing ', name, inc);
+         var compressed = self._composites[name];
+         if (compressed) {
+         data.count = compressed.comp_count;
+         }
 
-            var geo;
+         out.push(data);
 
-            var comp_count = 0;
+         return out;
+         }, []);
 
-            var old_comp = this._composites[name];
-            if (old_comp) {
+         groups = _.sortBy(groups, 'count');
 
-                if (old_comp.comp_count < this.compression_factor) {
-                    geo = old_comp.obj().geometry.clone();
-                    comp_count = old_comp.comp_count;
-                    this.display.remove(this._composites[name]);
-                } else {
-                    console.log('purging material ', name);
-                    this.display.remove(old_comp);
-                    // we have done a reset of this composite
-                    // re-grab all the active tiles of this material
-                    mat_tiles = _.filter(this.tiles, function (tile) {
-                        return tile.obj().material.name == name;
-                    });
+         this.compress_time = 0;
+         _.each(groups, function (data) {
+         var inc = new Date().getTime() - t;
+         if (inc > 10) {
+         this.compress_time = t;
+         return;
+         }
+         var name = data.name;
+         var mat_tiles = data.tiles;
+         console.log('compressing ', name, inc);
 
-                    geo = new THREE.Geometry();
-                }
-            } else {
-                geo = new THREE.Geometry();
+         var geo;
 
-            }
+         var comp_count = 0;
 
-            _.each(mat_tiles, function (t2) {
-                THREE.GeometryUtils.merge(geo, t2.obj());
-                t2.comp = true;
-                // t2.obj(new THREE.Object3D());
-                t2.set('visible', false);
-            });
+         var old_comp = this._composites[name];
+         if (old_comp) {
 
-            this._composites[name] = this.display.ro(name + '_merged' + name, geo);
-            this._composites[name].mat(name);
-            this._composites[name].comp_count = ++comp_count;
+         if (1 || old_comp.comp_count < this.compression_factor) {
+         geo = old_comp.obj().geometry.clone();
+         comp_count = old_comp.comp_count;
+         this.display.remove(this._composites[name]);
+         mat_tiles = _.filter(this.tiles, function (tile) {
+         return tile.obj().material.name == name;
+         });
+         _.each(mat_tiles, function(tile){tile.compresed = false;})
+         } else {
+         console.log('purging material ', name);
+         this.display.remove(old_comp);
+         // we have done a reset of this composite
+         // re-grab all the active tiles of this material
+         mat_tiles = _.filter(this.tiles, function (tile) {
+         return tile.obj().material.name == name;
+         });
 
-        }, this);
+         geo = new THREE.Geometry();
+         }
+         } else {
+         geo = new THREE.Geometry();
 
-        var n = new Date().getTime();
-        console.log('compressed in ', n - t, 'ms', '; group time is ', t1 - t);
+         }
+
+         _.each(mat_tiles, function (t2) {
+         THREE.GeometryUtils.merge(geo, t2.obj());
+         t2.comp = true;
+         // t2.obj(new THREE.Object3D());
+         t2.set('visible', false);
+         });
+
+         this._composites[name] = this.display.ro(name + '_merged' + name, geo);
+         this._composites[name].mat(name);
+         this._composites[name].comp_count = ++comp_count;
+
+         }, this);
+
+         var n = new Date().getTime();
+         console.log('compressed in ', n - t, 'ms', '; group time is ', t1 - t);*/
 
     },
 
@@ -1433,6 +1477,10 @@ _.extend(Infinite.prototype, {
     activate: function (tile) {
         tile.active = true;
         tile.comp = false;
+        if (!tile.parent && tile.obj().parent) {
+            this.display.add(tile);
+        }
+        tile.set('visible', true);
     },
 
     /**
@@ -1477,8 +1525,8 @@ _.extend(Infinite.prototype, {
         });
 
         if (inactive_tile) {
-            this.reuse_tile(inactive_tile, iter);
             this.activate(inactive_tile);
+            this.reuse_tile(inactive_tile, iter);
         } else {
             this.tiles.push(this.make_tile(iter));
         }
@@ -1504,7 +1552,7 @@ _.extend(Infinite.prototype, {
      * @param iter {Object} the ijk coordinate
      */
     reuse_tile: function (tile, iter) {
-        tile.compressed = false;
+        tile.comp = false;
         this.locate_tile(tile, iter);
         this.emit('reuse', tile, iter);
         _.extend(tile, iter);
@@ -1527,10 +1575,14 @@ _.extend(Infinite.prototype, {
      */
     new_tile: function (iter) {
         ++this._new_tiles;
+        var mat = this.tile_mat(iter);
+        var geo = this.tile_geo(iter);
+
+     //   console.log('iter:', iter,  'mat:', mat);
         var tile = this.display.ro('tile ' + JSON.stringify(iter),
             _.extend({tile: true, active: true, update_on_animate: false, created: new Date().getTime()}, iter));
-        tile.geo(this.tile_geo(iter))
-            .mat(this.tile_mat(iter));
+        tile.geo(geo)
+            .mat(mat);
         return tile;
     },
 
