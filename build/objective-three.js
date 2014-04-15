@@ -2066,9 +2066,6 @@ _.extend(
          * @returns {*}
          */
         rgb: function (r, g, b) {
-            if (arguments.length < 1) {
-                return this.obj().material.color;
-            }
 
             if (_.isArray(r)) {
                 b = r[2] || 0;
@@ -2076,17 +2073,36 @@ _.extend(
                 r = r[0] || 0;
             }
 
-            if (!this.obj().material.__color_clone) {
-                this.obj().material = this.obj().material.clone();
-                this.obj().material.__color_clone = true;
-                this.obj().material.__original_ro = this.id;
+            var target;
+
+            if (this.obj() instanceof THREE.Light) {
+                target = this.obj();
+            } else if (!this.mat()) {
+                return this;
+            } else {
+                target = this.mat();
+                if (arguments.length < 1) {
+                    return target.color;
+                }
+
+                if (!target.__color_clone) {
+                    // create a clone of the material for the purposes of altering the color of this instance
+                    target = this.obj().material.clone();
+                    target.__color_clone = true;
+                    target.__original_ro = this.id;
+                    this.mat(target);
+                }
             }
 
-            if (this.obj().material.color) {
+            if (arguments.length < 1) {
+                return target.color;
+            }
+
+            if (target.color) {
                 if (r instanceof THREE.Color) {
-                    this.obj().material.color = r;
+                    target.color = r;
                 } else {
-                    this.obj().material.color.setRGB(r, g, b);
+                    target.color.setRGB(r, g, b);
                 }
             }
             return this;
